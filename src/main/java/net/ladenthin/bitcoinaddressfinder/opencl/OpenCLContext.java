@@ -32,6 +32,7 @@ import net.ladenthin.bitcoinaddressfinder.opencl.binding.OpenClBinding;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.util.MultilineLogger;
+import net.ladenthin.bitcoinaddressfinder.util.PrivateKeyValidator;
 import org.apache.maven.artifact.versioning.ComparableVersion;
 import org.jspecify.annotations.Nullable;
 import org.lwjgl.opencl.CL10;
@@ -46,6 +47,12 @@ import org.slf4j.LoggerFactory;
 public class OpenCLContext implements ReleaseCLObject {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(OpenCLContext.class);
+
+    /**
+     * The libjsig check shared by every context of this JVM, so its warning is logged once per process
+     * rather than once per producer or tuner arm (see {@link SignalChainingCheck#warningOnce}).
+     */
+    private static final SignalChainingCheck SIGNAL_CHAINING_CHECK = new SignalChainingCheck();
 
     /**
      * Loads the OpenCL kernel sources from the classpath and strips {@code #include} directives.
@@ -95,7 +102,7 @@ public class OpenCLContext implements ReleaseCLObject {
     private static final String UNKNOWN_VENDOR = "unknown";
 
     /** Global work size of the fixed-base precompute kernels, which are single-work-item by design. */
-    private static final long[] SINGLE_WORK_ITEM = {1L};
+    private static final long SINGLE_WORK_ITEM = 1L;
 
     /**
      * {@code clBuildProgram} options string (Stage-0 quick win). Kept as a single constant so it is
@@ -330,6 +337,10 @@ public class OpenCLContext implements ReleaseCLObject {
     private final CProducerOpenCL producerOpenCL;
     private final BitHelper bitHelper;
 
+    /** Checks the alignment of each grid base before it is dispatched (see {@link #createKeys}). */
+    @ToString.Exclude
+    private final PrivateKeyValidator privateKeyValidator = new PrivateKeyValidator();
+
     @ToString.Exclude
     private final ClApi clApi;
 
@@ -350,6 +361,13 @@ public class OpenCLContext implements ReleaseCLObject {
 
     @ToString.Exclude
     private @Nullable OpenClTask openClTask;
+
+    /**
+     * Launches the kernels this context runs itself (precompute, benchmark hooks) with the local work
+     * size the key kernel gets too; set in {@link #init()}.
+     */
+    @ToString.Exclude
+    private @Nullable OpenClKernelLauncher kernelLauncher;
 
     /**
      * GPU VRAM buffer holding the Binary Fuse 8 fingerprint slot array.
@@ -447,34 +465,6 @@ public class OpenCLContext implements ReleaseCLObject {
         this.clApi = clApi;
     }
 
-    /** Reclaims the heap before a filter upload; injectable so the trigger can be verified. */
-    private GcTrigger gcTrigger = GcTrigger.SYSTEM;
-
-    /**
-     * Overrides the garbage-collection trigger. For tests only, so the reclaim-before-upload
-     * behaviour can be asserted against a mock without a real {@code System.gc()}.
-     *
-     * @param gcTrigger the trigger to use
-     */
-    @VisibleForTesting
-    void setGcTrigger(GcTrigger gcTrigger) {
-        this.gcTrigger = gcTrigger;
-    }
-
-    /**
-     * Reclaims the JVM heap right before a fingerprint buffer is created, so the driver can pin the
-     * host staging region {@code CL_MEM_COPY_HOST_PTR} needs. A filter is uploaded once, at startup,
-     * immediately after its build — no size gate is worth its complexity: the collection is a
-     * one-time cost of a few milliseconds, and skipping it risks the
-     * {@code CL_MEM_OBJECT_ALLOCATION_FAILURE} measured on RDNA3 when the build's ~40&nbsp;GB of
-     * transient garbage still occupies the heap. See {@link GcTrigger} for the cause and the JDK
-     * precedent.
-     */
-    @VisibleForTesting
-    void reclaimHeapBeforeUpload() {
-        gcTrigger.requestGc();
-    }
-
     /**
      * Initialises the OpenCL context, command queue, program and kernel.
      *
@@ -525,6 +515,14 @@ public class OpenCLContext implements ReleaseCLObject {
         // only; logged) — see resolveEffectiveNoInlineHelpers.
         final boolean effectiveNoInlineHelpers =
                 resolveEffectiveNoInlineHelpers(device.deviceName(), device.deviceVendor());
+        // The build is where an in-process LLVM takes over the JVM's signal handlers (see SignalChainingCheck).
+        // One shared instance: init() runs once per producer and once per tuner arm, the warning is logged once.
+        SIGNAL_CHAINING_CHECK
+                .warningOnce(
+                        System.getProperty("os.name", ""),
+                        System.getenv("LD_PRELOAD"),
+                        System.getProperty("java.home", ""))
+                .ifPresent(LOGGER::warn);
         clApi.buildProgram(localProgram, device.device(), buildOptions(effectiveNoInlineHelpers));
 
         if (producerOpenCL.logGpuDiagnostics) {
@@ -534,9 +532,23 @@ public class OpenCLContext implements ReleaseCLObject {
         // Create the kernel
         kernel = clApi.createKernel(localProgram, KERNEL_NAME);
 
-        logKernelResourceUsage(device);
+        final long kernelWorkGroupSize = logKernelResourceUsage(device);
+        final boolean poclCpuDevice = OpenClLocalWorkSize.isPoclCpuDevice(
+                selection.platform().platformName(), device.deviceVersion(), device.deviceType());
+        if (poclCpuDevice) {
+            LOGGER.info(
+                    "pocl CPU device: kernels are launched with a local work size of at most {} (driver"
+                            + " default for the key kernel here: {}), because pocl's larger work-groups overflow"
+                            + " its worker thread's stack and kill the JVM.",
+                    OpenClLocalWorkSize.POCL_CPU_MAX_LOCAL_WORK_SIZE,
+                    kernelWorkGroupSize);
+        }
 
-        openClTask = new OpenClTask(clApi, localContext, producerOpenCL, bitHelper, byteBufferUtility);
+        openClTask = new OpenClTask(
+                clApi, localContext, producerOpenCL, bitHelper, byteBufferUtility, kernelWorkGroupSize, poclCpuDevice);
+        // The other kernels of the context (precompute below, benchmark hooks) get the same choice,
+        // each for its own CL_KERNEL_WORK_GROUP_SIZE.
+        kernelLauncher = new OpenClKernelLauncher(clApi, device.device(), poclCpuDevice);
 
         // Allocate a dummy empty filter so the kernel's fuse8 arguments are always bindable.
         // uploadGpuFilter() replaces it with the real filter; until then the kernel runs in
@@ -562,8 +574,9 @@ public class OpenCLContext implements ReleaseCLObject {
      * device-local memory. {@code workGroupSizeMultiple} is the warp/wavefront size.
      *
      * @param device the selected OpenCL device the kernel was built for
+     * @return the kernel's {@code CL_KERNEL_WORK_GROUP_SIZE} on the device
      */
-    private void logKernelResourceUsage(OpenCLDevice device) {
+    private long logKernelResourceUsage(OpenCLDevice device) {
         final ClKernel localKernel = Objects.requireNonNull(kernel);
         // Width matters: the two work-group sizes are size_t, the two memory sizes are cl_ulong.
         final long kernelMaxWorkGroupSize =
@@ -582,6 +595,7 @@ public class OpenCLContext implements ReleaseCLObject {
                 localMemBytes);
         // The heuristic starting-config suggestion lives in the device-info block
         // (OpenCLDevice.toStringPretty, logged above and shown by the OpenCLInfo command).
+        return kernelMaxWorkGroupSize;
     }
 
     /**
@@ -680,8 +694,8 @@ public class OpenCLContext implements ReleaseCLObject {
      * {@code ProducerOpenCL}, fed by the engine) decomposes the filter's public payload into
      * the fingerprint byte array and the five metadata integers before invoking this method.
      *
-     * <p>Two {@code CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR} buffers are allocated and retained
-     * for later kernel-argument binding: the fingerprint slot array and a 5-int metadata buffer
+     * <p>Two {@code CL_MEM_READ_ONLY} buffers are allocated, filled through
+     * {@code ClApi.writeBufferChunked} and retained for later kernel-argument binding: the fingerprint slot array and a 5-int metadata buffer
      * {@code [seedLo, seedHi, segLen, segLenMask, segCountLen]}. An empty filter
      * ({@code fingerprints.length == 0}, i.e. {@code segCountLen == 0}) still allocates a
      * one-byte placeholder fingerprint buffer (zero-size device buffers are invalid); the kernel
@@ -816,9 +830,6 @@ public class OpenCLContext implements ReleaseCLObject {
         // the padding byte is never read.
         final boolean empty = fingerprintByteSize <= 0L;
         final long byteSize = empty ? 1L : fingerprintByteSize;
-        // An upload right after a filter build can fail to pin host memory while the build's
-        // transient garbage still occupies the heap (measured on RDNA3); reclaim it first.
-        reclaimHeapBeforeUpload();
         final ClMem localFpMem = clApi.createBuffer(localContext, ClBufferFlags.READ_ONLY, byteSize);
         try {
             if (!empty) {
@@ -917,7 +928,7 @@ public class OpenCLContext implements ReleaseCLObject {
             clApi.setKernelArg(convertKernel, 0, out);
             clApi.setKernelArg(convertKernel, 1, in);
             clApi.setKernelArgInt(convertKernel, 2, count);
-            clApi.enqueueNDRangeKernel(localQueue, convertKernel, SINGLE_WORK_ITEM, false);
+            Objects.requireNonNull(kernelLauncher).launch(localQueue, convertKernel, SINGLE_WORK_ITEM);
             clApi.finish(localQueue);
         } finally {
             clApi.releaseKernel(convertKernel);
@@ -943,7 +954,7 @@ public class OpenCLContext implements ReleaseCLObject {
             if (countArg != null) {
                 clApi.setKernelArgInt(precomputeKernel, 1, countArg);
             }
-            clApi.enqueueNDRangeKernel(localQueue, precomputeKernel, SINGLE_WORK_ITEM, false);
+            Objects.requireNonNull(kernelLauncher).launch(localQueue, precomputeKernel, SINGLE_WORK_ITEM);
             clApi.finish(localQueue);
         } finally {
             clApi.releaseKernel(precomputeKernel);
@@ -1079,7 +1090,7 @@ public class OpenCLContext implements ReleaseCLObject {
             clApi.setKernelArg(benchKernel, 0, out);
             clApi.setKernelArgInt(benchKernel, 1, iterations);
             clApi.setKernelArgInt(benchKernel, 2, inputHighLimbsZero ? 1 : 0);
-            clApi.enqueueNDRangeKernel(localQueue, benchKernel, new long[] {globalWorkSize}, false);
+            Objects.requireNonNull(kernelLauncher).launch(localQueue, benchKernel, globalWorkSize);
             clApi.finish(localQueue);
         } finally {
             clApi.releaseMemObject(out);
@@ -1170,9 +1181,6 @@ public class OpenCLContext implements ReleaseCLObject {
         releaseBenchFilterProbe(); // idempotent: a second prepare must not leak the first upload
         benchFilterProbeCount = probeKeys.length;
         benchFilterKernel = clApi.createKernel(localProgram, kernelName);
-        // Same host-memory-pinning trap as the production upload: reclaim the build's transient
-        // garbage so the driver can pin the staging region (see reclaimHeapBeforeUpload).
-        reclaimHeapBeforeUpload();
 
         final ClMem localFilterMem = clApi.createBuffer(localContext, ClBufferFlags.READ_ONLY, filterBytes);
         filterUpload.writeInto(localQueue, localFilterMem);
@@ -1216,7 +1224,7 @@ public class OpenCLContext implements ReleaseCLObject {
                             + benchFilterProbeCount
                             + ")");
         }
-        clApi.enqueueNDRangeKernel(localQueue, k, new long[] {benchFilterProbeCount}, false);
+        Objects.requireNonNull(kernelLauncher).launch(localQueue, k, benchFilterProbeCount);
         clApi.finish(localQueue);
         return benchFilterProbeCount;
     }
@@ -1266,7 +1274,7 @@ public class OpenCLContext implements ReleaseCLObject {
             clApi.setKernelArg(benchKernel, 0, out);
             clApi.setKernelArgInt(benchKernel, 1, iterations);
             clApi.setKernelArgInt(benchKernel, 2, useReducedRadix ? 1 : 0);
-            clApi.enqueueNDRangeKernel(localQueue, benchKernel, new long[] {globalWorkSize}, false);
+            Objects.requireNonNull(kernelLauncher).launch(localQueue, benchKernel, globalWorkSize);
             clApi.finish(localQueue);
         } finally {
             clApi.releaseMemObject(out);
@@ -1289,6 +1297,7 @@ public class OpenCLContext implements ReleaseCLObject {
                 openClTask.close();
                 openClTask = null;
             }
+            kernelLauncher = null;
             if (kernel != null) {
                 clApi.releaseKernel(kernel);
                 kernel = null;
@@ -1338,6 +1347,15 @@ public class OpenCLContext implements ReleaseCLObject {
                     + ". This would silently drop funded addresses; refusing to dispatch.");
         }
         final int filterType = configuredType.getWireValue();
+        // The kernel derives a work item's key as baseK0 | base_offset (an OR into the lowest word),
+        // which is base + offset -- the key the host names for a hit -- only for an aligned base. An
+        // unaligned one would compute other keys than the results report, silently. Checked once per
+        // grid, before anything is dispatched; the producers always align (createSecretBase).
+        if (!privateKeyValidator.isAlignedToBatchSize(privateKeyBase, producerOpenCL.batchSizeInBits)) {
+            throw new IllegalArgumentException("secretBase " + privateKeyBase.toString(16)
+                    + " is not aligned to 2^" + producerOpenCL.batchSizeInBits
+                    + "; the kernel would compute other keys than it reports. Refusing to dispatch.");
+        }
 
         localOpenClTask.setSrcPrivateKeyChunk(privateKeyBase);
         ByteBuffer dstByteBuffer = localOpenClTask.executeKernel(

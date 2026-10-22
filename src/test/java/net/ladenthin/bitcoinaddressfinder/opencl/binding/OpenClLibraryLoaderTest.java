@@ -19,6 +19,10 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -141,6 +145,58 @@ class OpenClLibraryLoaderTest {
 
         // assert
         verify(initializer, times(1)).create();
+    }
+
+    @Test
+    void ensureLoaded_calledFromTwoThreadsAtOnce_initializesOnlyOnce() throws Exception {
+        // arrange: the first create() is held until the second thread has called ensureLoaded();
+        // LWJGL's CL.create() throws when OpenCL is created a second time
+        final CountDownLatch firstCreateEntered = new CountDownLatch(1);
+        final CountDownLatch releaseFirstCreate = new CountDownLatch(1);
+        final AtomicInteger creates = new AtomicInteger();
+        final AtomicBoolean created = new AtomicBoolean();
+        final ClLibraryInitializer initializer = new ClLibraryInitializer() {
+            @Override
+            public void create() {
+                if (creates.incrementAndGet() == 1) {
+                    firstCreateEntered.countDown();
+                    try {
+                        releaseFirstCreate.await(5, TimeUnit.SECONDS);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+                created.set(true);
+            }
+
+            @Override
+            public void create(String libraryName) {
+                throw new AssertionError("no fallback expected");
+            }
+
+            @Override
+            public boolean isCreated() {
+                return created.get();
+            }
+        };
+        final OpenClLibraryLoader loader = new OpenClLibraryLoader(initializer);
+
+        // act
+        final Thread first = new Thread(loader::ensureLoaded, "first");
+        first.start();
+        assertThat(firstCreateEntered.await(5, TimeUnit.SECONDS), is(true));
+        final Thread second = new Thread(loader::ensureLoaded, "second");
+        second.start();
+        final long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (second.isAlive() && second.getState() != Thread.State.BLOCKED && System.nanoTime() < deadline) {
+            second.join(10);
+        }
+        releaseFirstCreate.countDown();
+        first.join(5_000);
+        second.join(5_000);
+
+        // assert
+        assertThat(creates.get(), is(1));
     }
 
     @Test

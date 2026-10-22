@@ -342,13 +342,16 @@ See `examples/config_*.json` for all configuration variants.
 ### Conventions
 
 - Tests use forked JVMs (1 fork, no reuse) for isolation.
-- There is **no JUnit per-test timeout**. The only hard bound is the Surefire
+- There is **no project-wide JUnit per-test timeout**. The hard bound is the Surefire
   whole-fork timeout (`forkedProcessTimeoutInSeconds`, 240s in `pom.xml`): with
   `reuseForks=false` it must cover JVM startup + every method of one test class +
   JVM shutdown. A fork that exceeds it is killed and the build fails with
   "There was a timeout in the fork" — without per-test diagnostics. Test classes
   must therefore never leak resources (sockets, ZMQ contexts, executors) that
-  could stall fork shutdown.
+  could stall fork shutdown. Tests that wait on a network peer carry their own
+  `@Timeout` (`KeyProducerJavaSocketTest`, `KeyProducerJavaZmqTest`), so a hang fails
+  that test instead; `src/test/resources/junit-platform.properties` makes JUnit print
+  a thread dump when a `@Timeout` fires.
 - Base/utility test classes: `LMDBBase`, `BIP39DataProvider`, `TestTimeProvider`, `KeyProducerTestUtility`.
 - LMDB tests can be skipped with system property:
   ```
@@ -358,7 +361,7 @@ See `examples/config_*.json` for all configuration variants.
 
 ### Test execution policy for AI assistants
 
-**A full `mvn test` run takes ~5 minutes on this repo (1 785 tests, forked JVMs, LMDB and OpenCL probe paths).** That is far too slow to invoke after every small edit. Default to the **narrowest meaningful test surface** for the change at hand and only run a full suite when the user explicitly asks for it.
+**A full `mvn test` run takes ~5 minutes on this repo (about 2 900 tests, forked JVMs, LMDB and OpenCL probe paths).** That is far too slow to invoke after every small edit. Default to the **narrowest meaningful test surface** for the change at hand and only run a full suite when the user explicitly asks for it.
 
 Recommended scoping by change type:
 
@@ -528,8 +531,11 @@ its step: the server aligns every incoming base down to a multiple of `2^batchSi
 client stepping by less resubmits one block forever while the rest of its range is never touched —
 silently, since nothing rejects a misaligned base. But the servers accept connections in
 `startKeyProducer()`, before `configureProducer()` exists to say what the grid is. Each transport
-therefore catches up as best it can (see the table below). When producers disagree on
-`batchSizeInBits`, the largest is announced — the only value that cannot make ranges overlap.
+therefore catches up as best it can (see the table below). Each broadcaster announces the grid of
+the producers its own key producer feeds (a producer on another key producer never sees its bases).
+When those disagree on `batchSizeInBits`, the smallest is announced, with a warning: each base goes
+to one producer, so a larger step would leave gaps in the blocks of the producers with the smaller
+grid, while the smaller step only makes the others, which align the base down, check a block twice.
 
 ### What each transport can and cannot promise
 

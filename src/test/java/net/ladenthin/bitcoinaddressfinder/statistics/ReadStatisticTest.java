@@ -179,6 +179,7 @@ public class ReadStatisticTest {
         assertThat(result, containsString("unsupportedReasons="));
         assertThat(result, containsString("currentFileProgress="));
         assertThat(result, containsString("errors="));
+        assertThat(result, containsString("errorCount="));
     }
 
     @Test
@@ -216,7 +217,7 @@ public class ReadStatisticTest {
                 result,
                 is(
                         equalTo(
-                                "ReadStatistic(successful=10, unsupportedReasons={address is empty=2, P2TR is not supported=1}, currentFileProgress=75.0, errors=[some error], unsupportedTotal=3)")));
+                                "ReadStatistic(successful=10, unsupportedReasons={address is empty=2, P2TR is not supported=1}, currentFileProgress=75.0, errors=[some error], errorCount=1, unsupportedTotal=3)")));
     }
 
     private static ReadStatistic createReadStatisticWithAllFieldsSet() {
@@ -227,6 +228,7 @@ public class ReadStatisticTest {
         readStatistic.incrementUnsupported("P2TR is not supported");
         readStatistic.currentFileProgress = 75.0;
         readStatistic.errors.add("some error");
+        readStatistic.errorCount = 1L;
         return readStatistic;
     }
     // </editor-fold>

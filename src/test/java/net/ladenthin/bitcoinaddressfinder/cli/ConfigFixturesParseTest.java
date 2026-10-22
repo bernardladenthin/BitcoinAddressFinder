@@ -8,12 +8,14 @@ import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConfiguration;
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
+import net.ladenthin.bitcoinaddressfinder.engine.Finder;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -34,6 +36,26 @@ public class ConfigFixturesParseTest {
     private static final int EXPECTED_STATISTICS_RATE_WINDOW_SECONDS = 60;
 
     public ConfigFixturesParseTest() {}
+
+    /**
+     * The secrets-file example is what {@code run_Find_SecretsFile} starts. Every producer, this one
+     * included, must name a configured key producer; {@code MainTest} runs a copy under
+     * {@code src/test/resources/testRoundtrip/} that does, so only a check of the shipped file sees
+     * the example itself.
+     */
+    @Test
+    public void secretsFileExample_everyProducerNamesAConfiguredKeyProducer() throws Exception {
+        // arrange
+        CConfiguration parsed = Main.loadConfiguration(Path.of("examples", "config_Find_SecretsFile.json"));
+        Finder finder = new Finder(parsed.finder);
+
+        // act, assert
+        try {
+            assertDoesNotThrow(finder::startKeyProducer);
+        } finally {
+            finder.interrupt();
+        }
+    }
 
     @Test
     public void allFindExampleConfigs_carryExplicitAwaitTimeouts() throws Exception {

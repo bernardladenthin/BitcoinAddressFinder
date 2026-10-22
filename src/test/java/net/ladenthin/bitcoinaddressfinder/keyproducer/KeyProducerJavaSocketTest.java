@@ -25,14 +25,29 @@ import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.util.NetworkParameterFactory;
+import nl.altindag.log.LogCaptor;
 import org.bitcoinj.base.Network;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class KeyProducerJavaSocketTest {
+
+    /** The IPv4 loopback address: this machine, named without a lookup. */
+    private static final String LOOPBACK_ADDRESS = "127.0.0.1";
+
+    /**
+     * An address of TEST-NET-1 (RFC 5737), reserved for documentation: it is assigned to no machine and
+     * resolved by no DNS, so a client against it is a client against another machine without a network.
+     */
+    private static final String TEST_NET_1_HOST = "192.0.2.1";
+
+    /** A name under the reserved {@code .invalid} top-level domain (RFC 2606), which never resolves. */
+    private static final String UNRESOLVABLE_HOST = "no-such-host.invalid";
 
     private final Network network = new NetworkParameterFactory().getNetwork();
     private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
@@ -349,6 +364,40 @@ public class KeyProducerJavaSocketTest {
     }
 
     @Test
+    public void createSecrets_peerReconnectsMoreOftenThanTheRetryCount_keepsReading() throws Exception {
+        // connectRetryCount bounds the attempts to (re)establish a connection. It must not be a
+        // lifetime budget: a feed that disconnects and reconnects more often than that, each time
+        // after a successful connection, must keep being read.
+        final int connections = 4;
+        int port = findFreePort();
+        ServerSocket serverSocket = new ServerSocket(port);
+        Future<Void> serverFuture = executorService.submit(() -> {
+            for (int i = 0; i < connections; i++) {
+                try (Socket s = serverSocket.accept();
+                        DataOutputStream dos = new DataOutputStream(s.getOutputStream())) {
+                    dos.write(new KeyProducerTestUtility().createFilledSecret((byte) (i + 1)));
+                    dos.flush();
+                }
+            }
+            return null;
+        });
+
+        CKeyProducerJavaSocket clientConfig = createClientConfig("localhost", port);
+        clientConfig.connectRetryCount = 2;
+        clientConfig.connectRetryDelayMillis = TestTimeProvider.SHORT_DELAY;
+        KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper);
+        client.start();
+
+        // act, assert: one secret per connection, more connections than connectRetryCount
+        for (int i = 0; i < connections; i++) {
+            BigInteger[] secrets = client.createSecrets(1, true);
+            assertThat(secrets.length, is(1));
+        }
+
+        cleanup(client, serverFuture, serverSocket);
+    }
+
+    @Test
     public void createSecrets_afterClose_reconnectsAndReadsSuccessfully() throws Exception {
         int port = findFreePort();
 
@@ -544,7 +593,7 @@ public class KeyProducerJavaSocketTest {
     }
 
     @Test
-    public void createSecrets_malformedSecretStream_throwsException() throws Exception {
+    public void createSecrets_malformedSecretStream_returnsTheCompleteSecretThenThrows() throws Exception {
         int port = findFreePort();
 
         ServerSocket serverSocket = new ServerSocket(port);
@@ -563,6 +612,9 @@ public class KeyProducerJavaSocketTest {
         client.start();
 
         try {
+            // The first 32 bytes are a complete secret: it is returned as a shorter batch rather than
+            // lost with the timeout that follows. The trailing 8 bytes never make a secret.
+            assertThat(client.createSecrets(2, false), is(equalTo(new BigInteger[] {BigInteger.ZERO})));
             assertThrows(NoMoreSecretsAvailableException.class, () -> client.createSecrets(2, false));
         } finally {
             cleanup(client, serverFuture, serverSocket);
@@ -680,6 +732,207 @@ public class KeyProducerJavaSocketTest {
 
         assertThat("Thread exited without triggering interrupt", state.get(), is(not(STATE_UNEXPECTED_SUCCESS)));
         assertThat("Expected interrupt to cause shutdown", state.get(), is(STATE_INTERRUPTED_EXIT));
+    }
+
+    @Test
+    @Timeout(value = 10000, unit = TimeUnit.MILLISECONDS)
+    public void start_noPeerAfterAllRetries_logsTheFailureInsteadOfLosingItInTheFuture() throws Exception {
+        // The reader ends with "Unable to establish socket connection ... after N attempts", thrown inside
+        // a future nobody reads; without a log line the user only ever saw the single attempt warnings.
+        CKeyProducerJavaSocket config = createClientConfig("localhost", findFreePort());
+        config.timeoutMillis = TestTimeProvider.SOCKET_ACCEPT_TIMEOUT;
+        config.connectRetryCount = 1;
+        config.connectRetryDelayMillis = 0;
+
+        try (LogCaptor logCaptor = LogCaptor.forClass(KeyProducerJavaSocket.class)) {
+            KeyProducerJavaSocket client = new KeyProducerJavaSocket(config, keyUtility, bitHelper);
+            try {
+                client.start();
+                long deadline = System.currentTimeMillis() + 5000;
+                while (logCaptor.getErrorLogs().isEmpty() && System.currentTimeMillis() < deadline) {
+                    Thread.sleep(20);
+                }
+                assertThat(logCaptor.getErrorLogs(), hasItem(containsString("Unable to establish socket connection")));
+            } finally {
+                client.interrupt();
+            }
+        }
+    }
+
+    @Test
+    public void constructor_negativeTimeout_isRejectedInsteadOfHangingSilently() {
+        // java.net rejects a negative SO_TIMEOUT with IllegalArgumentException. Thrown inside the reader
+        // future, nothing ever saw it: the reader died without a log line and createSecrets blocked in
+        // take() forever (a negative timeout means "block" there). The configuration documents that a
+        // negative value prevents the producer from initialising.
+        CKeyProducerJavaSocket config = createServerConfig(findFreePort());
+        config.timeoutMillis = -1;
+
+        IllegalArgumentException e = assertThrows(
+                IllegalArgumentException.class, () -> new KeyProducerJavaSocket(config, keyUtility, bitHelper));
+        assertThat(e.getMessage(), containsString("-1"));
+    }
+
+    @Test
+    public void constructor_serverPortIsTheResultPort_isRejectedInsteadOfEndingWithoutAKey() {
+        // In server mode the key producer listens on port and the result server on resultPort. With
+        // the same number the result server, started first, takes the port, every accept attempt
+        // fails with "Address already in use", and once timeoutMillis passed without a secret the run
+        // ended as a regular one with exit 0 - without a single key checked.
+        CKeyProducerJavaSocket config = createServerConfig(findFreePort());
+        config.broadcastResults = true;
+        config.resultPort = config.port;
+
+        IllegalArgumentException e = assertThrows(
+                IllegalArgumentException.class, () -> new KeyProducerJavaSocket(config, keyUtility, bitHelper));
+        assertThat(e.getMessage(), containsString("resultPort"));
+        assertThat(e.getMessage(), containsString(String.valueOf(config.port)));
+    }
+
+    /**
+     * Guards the client-mode half of the port collision. The result server binds {@code resultPort} on
+     * every interface (Finder#startConsumer) before the key producer connects, so a client against this
+     * machine with {@code port == resultPort} and {@code broadcastResults} connected to its own result
+     * server, read that server's JSON lines as 32-byte secrets and checked nonsense keys without a word.
+     * The old check looked at server mode only, so the constructor accepted this configuration.
+     */
+    @Test
+    public void constructor_clientPortIsTheResultPortAgainstLocalhost_isRejectedInsteadOfReadingItsOwnResults() {
+        // arrange
+        CKeyProducerJavaSocket config = createClientConfig("localhost", findFreePort());
+        config.broadcastResults = true;
+        config.resultPort = config.port;
+
+        // act
+        IllegalArgumentException e = assertThrows(
+                IllegalArgumentException.class, () -> new KeyProducerJavaSocket(config, keyUtility, bitHelper));
+
+        // assert
+        assertThat(e.getMessage(), containsString("resultPort"));
+        assertThat(e.getMessage(), containsString(String.valueOf(config.port)));
+        assertThat(e.getMessage(), containsString("client mode against the local host localhost"));
+    }
+
+    /**
+     * Guards the same collision for a host given as the loopback address rather than by name: the
+     * decision must look at the resolved address, not at the spelling. The old check, server mode only,
+     * accepted this configuration too.
+     */
+    @Test
+    public void constructor_clientPortIsTheResultPortAgainstLoopbackAddress_isRejected() {
+        // arrange
+        CKeyProducerJavaSocket config = createClientConfig(LOOPBACK_ADDRESS, findFreePort());
+        config.broadcastResults = true;
+        config.resultPort = config.port;
+
+        // act
+        IllegalArgumentException e = assertThrows(
+                IllegalArgumentException.class, () -> new KeyProducerJavaSocket(config, keyUtility, bitHelper));
+
+        // assert
+        assertThat(e.getMessage(), containsString("resultPort"));
+        assertThat(e.getMessage(), containsString(String.valueOf(config.port)));
+    }
+
+    /**
+     * Guards the scope of the client-mode check: a client against another machine may serve results on
+     * the number it connects to, because the two sockets live on different hosts. Without this the check
+     * could be written as "client mode and both ports equal", which would refuse a valid setup.
+     */
+    @Test
+    public void constructor_clientPortIsTheResultPortAgainstAnotherMachine_isAccepted() {
+        // arrange
+        CKeyProducerJavaSocket config = createClientConfig(TEST_NET_1_HOST, findFreePort());
+        config.broadcastResults = true;
+        config.resultPort = config.port;
+
+        // act
+        KeyProducerJavaSocket producer = new KeyProducerJavaSocket(config, keyUtility, bitHelper);
+
+        // assert
+        try {
+            assertThat(producer, is(notNullValue()));
+        } finally {
+            producer.interrupt();
+        }
+    }
+
+    /**
+     * Guards the other scope boundary: {@code resultPort} is bound only while results are broadcast, so
+     * a client against this machine with equal numbers and no broadcast has nothing to collide with.
+     */
+    @Test
+    public void constructor_clientPortIsTheResultPortWithoutBroadcast_isAccepted() {
+        // arrange
+        CKeyProducerJavaSocket config = createClientConfig("localhost", findFreePort());
+        config.broadcastResults = false;
+        config.resultPort = config.port;
+
+        // act
+        KeyProducerJavaSocket producer = new KeyProducerJavaSocket(config, keyUtility, bitHelper);
+
+        // assert
+        try {
+            assertThat(producer, is(notNullValue()));
+        } finally {
+            producer.interrupt();
+        }
+    }
+
+    /**
+     * Guards the "is this host local" decision the client-mode check rests on, over the ways this
+     * machine can be named: by the loopback name, the IPv4 and IPv6 loopback addresses, and the wildcard
+     * address every result server binds. A decision by spelling would miss all but the first.
+     *
+     * @param host a host that names this machine
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"localhost", LOOPBACK_ADDRESS, "0.0.0.0", "::1"})
+    public void isLocalHost_thisMachine_returnsTrue(String host) {
+        // act, assert
+        assertThat(KeyProducerJavaSocket.isLocalHost(host), is(true));
+    }
+
+    /**
+     * Guards the two ways a host is not this machine: an address that belongs to no interface here, and
+     * a name that does not resolve at all. The second must not be local either, so a typo in the host
+     * fails on the connect with its own message instead of as a port collision that is none.
+     *
+     * @param host a host that does not name this machine
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {TEST_NET_1_HOST, UNRESOLVABLE_HOST})
+    public void isLocalHost_anotherOrUnknownHost_returnsFalse(String host) {
+        // act, assert
+        assertThat(KeyProducerJavaSocket.isLocalHost(host), is(false));
+    }
+
+    @Test
+    public void start_serverPortHeldByAnotherProcess_failsTheStartInsteadOfEndingWithoutAKey() throws Exception {
+        // A port held by someone else is not a transient failure. Retrying it in the reader only
+        // logged warnings, and once timeoutMillis passed without a secret the run ended as a regular
+        // one with exit 0. Like other servers (Apache, Spring Boot), the start itself fails now.
+        try (ServerSocket occupant = new ServerSocket(findFreePort())) {
+            CKeyProducerJavaSocket config = createServerConfig(occupant.getLocalPort());
+            KeyProducerJavaSocket producer = new KeyProducerJavaSocket(config, keyUtility, bitHelper);
+            try {
+                IllegalStateException e = assertThrows(IllegalStateException.class, producer::start);
+                assertThat(e.getMessage(), containsString(String.valueOf(occupant.getLocalPort())));
+            } finally {
+                producer.interrupt();
+            }
+        }
+    }
+
+    @Test
+    public void constructor_serverPortIsTheResultPortWithoutBroadcast_isAccepted() {
+        // resultPort is not bound when nothing is broadcast, so the same number does not collide.
+        CKeyProducerJavaSocket config = createServerConfig(findFreePort());
+        config.broadcastResults = false;
+        config.resultPort = config.port;
+
+        KeyProducerJavaSocket producer = new KeyProducerJavaSocket(config, keyUtility, bitHelper);
+        producer.interrupt();
     }
 
     @Test

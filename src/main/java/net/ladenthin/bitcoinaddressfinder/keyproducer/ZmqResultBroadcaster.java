@@ -4,7 +4,9 @@
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.annotations.VisibleForTesting;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.core.BatchResult;
@@ -56,10 +58,14 @@ public class ZmqResultBroadcaster implements ResultListener, AutoCloseable {
     private static final int CONFIG_REPUBLISH_EVERY_N_BATCHES = 64;
 
     /**
-     * Linger of zero, so closing the context can never stall on undelivered messages. Results are
-     * best-effort by nature; blocking a shutdown to flush them would be the wrong trade.
+     * How long {@link #close()} may wait for messages the {@code PUB} socket has not written yet.
+     *
+     * <p>The last batch messages of a run are its completion signal; a linger of zero discarded them
+     * whenever a subscriber was behind at shutdown. Bounded to the same 2 s the socket broadcaster
+     * drains for, so a subscriber that has stopped reading delays the shutdown by at most that much.
+     * Public because the finder counts it into the shutdown budget the JVM shutdown hook waits for.
      */
-    private static final int LINGER_MILLIS = 0;
+    public static final int LINGER_MILLIS = 2_000;
 
     private final BatchResultJsonFormatter formatter;
 
@@ -82,6 +88,23 @@ public class ZmqResultBroadcaster implements ResultListener, AutoCloseable {
     private final AtomicInteger batchesSinceConfigRepublish = new AtomicInteger();
 
     /**
+     * Serialises every use of {@link #publisher}. A ZeroMQ socket is not thread-safe, and
+     * {@link #onBatchChecked(BatchResult)} is called from all of the consumer's worker threads
+     * while {@link #close()} comes from the shutdown path: unserialised, concurrent sends corrupted
+     * jeromq's pipe state and left the sending consumer threads spinning forever.
+     */
+    @ToString.Exclude
+    private final Object socketLock = new Object();
+
+    /** Set by {@link #close()} under {@link #socketLock}; a send after it is skipped. */
+    @ToString.Exclude
+    private boolean closed;
+
+    /** Set by the first send after {@link #close()}, so that send is logged once and not per batch. */
+    @ToString.Exclude
+    private final AtomicBoolean sendAfterCloseReported = new AtomicBoolean();
+
+    /**
      * Creates a publisher bound to the given address.
      *
      * @param publishAddress the ZeroMQ address to bind the {@code PUB} socket to
@@ -97,10 +120,25 @@ public class ZmqResultBroadcaster implements ResultListener, AutoCloseable {
      * @param formatter      renders the wire messages
      */
     public ZmqResultBroadcaster(String publishAddress, BatchResultJsonFormatter formatter) {
+        this(publishAddress, formatter, LINGER_MILLIS);
+    }
+
+    /**
+     * Creates a publisher with an explicit linger.
+     *
+     * <p>Only for tests: a test that proves {@link #close()} keeps pending messages must not race the
+     * shipped {@link #LINGER_MILLIS} against the speed of the machine it runs on.
+     *
+     * @param publishAddress the ZeroMQ address to bind the {@code PUB} socket to
+     * @param formatter      renders the wire messages
+     * @param lingerMillis   how long {@link #close()} may wait for messages not yet written
+     */
+    @VisibleForTesting
+    ZmqResultBroadcaster(String publishAddress, BatchResultJsonFormatter formatter, int lingerMillis) {
         this.formatter = formatter;
         this.context = new ZContext();
         this.publisher = context.createSocket(SocketType.PUB);
-        this.publisher.setLinger(LINGER_MILLIS);
+        this.publisher.setLinger(lingerMillis);
         this.publisher.bind(publishAddress);
         LOGGER.info("Publishing results on {}", publishAddress);
     }
@@ -161,17 +199,47 @@ public class ZmqResultBroadcaster implements ResultListener, AutoCloseable {
      * @param message the message to publish
      */
     private void send(String message) {
+        final byte[] bytes = message.getBytes(StandardCharsets.UTF_8);
         try {
-            publisher.send(message.getBytes(StandardCharsets.UTF_8), ZMQ.DONTWAIT);
+            synchronized (socketLock) {
+                if (closed) {
+                    reportSendAfterClose();
+                    return;
+                }
+                publisher.send(bytes, ZMQ.DONTWAIT);
+            }
         } catch (RuntimeException e) {
             // Called from the consumer's worker threads: a transport failure must not disturb the scan.
             LOGGER.warn("Publishing a result failed; continuing.", e);
         }
     }
 
+    /**
+     * Logs, once, that a message arrived after {@link #close()}: it is not published, and a subscriber
+     * waiting for the batch it reports would otherwise never learn why it did not arrive.
+     */
+    private void reportSendAfterClose() {
+        if (sendAfterCloseReported.compareAndSet(false, true)) {
+            LOGGER.warn("The result publisher is already closed; results reported from now on are not published.");
+        }
+    }
+
+    /**
+     * Closes the socket and the context. The context's close waits up to the socket's linger for a
+     * subscriber to take what is queued, and it runs under the socket lock, so a consumer thread that
+     * publishes at the same time (the finder closes the broadcasters after the consumer, but a consumer
+     * whose drain timed out may still be running) waits as long; it then sees the broadcaster closed,
+     * logs that once and returns.
+     */
     @Override
     public void close() {
-        publisher.close();
-        context.close();
+        synchronized (socketLock) {
+            if (closed) {
+                return;
+            }
+            closed = true;
+            publisher.close();
+            context.close();
+        }
     }
 }

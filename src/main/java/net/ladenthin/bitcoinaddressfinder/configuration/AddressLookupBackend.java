@@ -22,10 +22,10 @@ package net.ladenthin.bitcoinaddressfinder.configuration;
  *       (~10 GB RAM at 132 M entries) on machines with enough RAM.</li>
  *   <li>{@link #TRUNCATED_LONG_64} - 256-bucket sorted {@code long[]} snapshot keeping
  *       only the first 8 bytes after the bucket byte (72-bit effective resolution).
- *       Probabilistic with negligible false-positive rate (N/2&#x2074;&#x2074;), the
- *       enclosing chain must fall through to the LMDB delegate to disambiguate a
- *       collision but in practice that is expected ~10&#x207B;&#x00b9;&#x00b9; per
- *       query at the project's largest published database size. ~8 B/entry, primitive
+ *       Probabilistic with a false-positive rate of N/2&#x2077;&#x00b2;, ~3 &#x00d7;
+ *       10&#x207B;&#x00b9;&#x00b3; per query at the project's largest published database
+ *       size. Self-contained, so LMDB is closed after population and a collision is
+ *       <em>not</em> verified: it is reported as a hit. No false negatives. ~8 B/entry, primitive
  *       {@code long} binary search uses the JDK intrinsic and is among the fastest
  *       lookups on a <em>small</em> database (~10&#x00d7; more compact than HASHSET at
  *       near-HASHSET latency). Latency degrades with size faster than any other backend,
@@ -62,7 +62,8 @@ public enum AddressLookupBackend {
     /**
      * Truncated 64-bit snapshot in RAM (256 buckets by first byte; each entry stored
      * as the next 8 bytes of the hash160 as a primitive {@code long}). Probabilistic
-     * with negligible FPR; LMDB closed and GC'd after population.
+     * with negligible FPR (N/2^72); LMDB closed and GC'd after population, so a collision
+     * is reported as an unverified hit.
      */
     TRUNCATED_LONG_64,
 

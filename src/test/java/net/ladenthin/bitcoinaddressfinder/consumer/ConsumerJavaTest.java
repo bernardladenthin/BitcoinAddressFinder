@@ -6,6 +6,7 @@ package net.ladenthin.bitcoinaddressfinder.consumer;
 import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.core.StringStartsWith.startsWith;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
@@ -20,6 +21,7 @@ import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import net.ladenthin.bitcoinaddressfinder.AwaitTimeTest;
 import net.ladenthin.bitcoinaddressfinder.AwaitTimeTests;
 import net.ladenthin.bitcoinaddressfinder.CommonDataProvider;
@@ -27,13 +29,17 @@ import net.ladenthin.bitcoinaddressfinder.LMDBPlatformAssume;
 import net.ladenthin.bitcoinaddressfinder.ManualDebugConstants;
 import net.ladenthin.bitcoinaddressfinder.MockKeyProducer;
 import net.ladenthin.bitcoinaddressfinder.ToStringTest;
+import net.ladenthin.bitcoinaddressfinder.configuration.AddressLookupBackend;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
+import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationWrite;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import net.ladenthin.bitcoinaddressfinder.model.PublicKeyBytes;
+import net.ladenthin.bitcoinaddressfinder.persistence.AddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.Persistence;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
+import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
 import net.ladenthin.bitcoinaddressfinder.producer.ProducerJava;
 import net.ladenthin.bitcoinaddressfinder.secret.BIP39Wordlist;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddresses1337;
@@ -47,11 +53,13 @@ import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.util.NetworkParameterFactory;
 import nl.altindag.log.LogCaptor;
 import org.apache.commons.codec.binary.Hex;
+import org.bitcoinj.base.Coin;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.crypto.ECKey;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 
 public class ConsumerJavaTest {
@@ -112,6 +120,40 @@ public class ConsumerJavaTest {
     }
 
     @Test
+    public void containsAddress_lookupsFasterThanAMillisecond_sumOfTimeIsStillMeasured() {
+        // arrange: a lookup that takes 200 µs, far below the millisecond clock's resolution
+        final long lookupNanos = TimeUnit.MICROSECONDS.toNanos(200);
+        final int lookups = 5;
+        ConsumerJava consumerJava = new ConsumerJava(new CConsumerJava(), keyUtility, persistenceUtils);
+        consumerJava.initWithLookup(new AddressPresence() {
+            @Override
+            public boolean containsAddress(ByteBuffer hash160) {
+                final long end = System.nanoTime() + lookupNanos;
+                while (System.nanoTime() < end) {
+                    Thread.onSpinWait();
+                }
+                return false;
+            }
+
+            @Override
+            public boolean requiresBackend() {
+                return false;
+            }
+        });
+        ByteBuffer reuseable = ByteBuffer.allocateDirect(OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES);
+
+        // act
+        for (int i = 0; i < lookups; i++) {
+            consumerJava.containsAddress(reuseable, new byte[OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES]);
+        }
+
+        // assert: every lookup took at least lookupNanos, and the sum is kept in nanoseconds
+        assertThat(
+                consumerJava.checkedKeysSumOfTimeToCheckContains.get(),
+                is(greaterThanOrEqualTo(lookups * lookupNanos)));
+    }
+
+    @Test
     public void initLMDB_lmdbOnlyBackend_keepsEnvOpenForDirectLookups() throws Exception {
         // Regression: LMDB_ONLY uses the LMDBPersistence itself as the lookup. initLMDB must
         // NOT close its env (it would if LMDBPersistence.requiresBackend() returned false),
@@ -168,6 +210,71 @@ public class ConsumerJavaTest {
             ByteBuffer buffer = ByteBuffer.allocateDirect(OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES);
             consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73(), null);
             consumerJava.consumeOneCycle(buffer);
+        } finally {
+            consumerJava.interrupt();
+        }
+    }
+
+    /**
+     * Writes an LMDB holding a single address that is <em>not</em> the compressed address of private key 73
+     * but shares its first nine bytes (bytes 9&#x2013;19 inverted), so it collides with it in the 72 bits
+     * {@link AddressLookupBackend#TRUNCATED_LONG_64} compares.
+     */
+    private File createLmdbWithA72BitCollisionOfPrivateKey73() throws Exception {
+        File lmdbFolder =
+                Files.createDirectory(folder.resolve("lmdb-72-bit-collision")).toFile();
+        byte[] collision = createExamplePublicKeyBytesfromPrivateKey73()[0].getCompressedKeyHash();
+        for (int i = 9; i < collision.length; i++) {
+            collision[i] = (byte) ~collision[i];
+        }
+        CLMDBConfigurationWrite write = new CLMDBConfigurationWrite();
+        write.initialMapSizeInMiB = 1;
+        write.lmdbDirectory = lmdbFolder.getAbsolutePath();
+        try (LMDBPersistence lmdb = new LMDBPersistence(write, persistenceUtils)) {
+            lmdb.init();
+            lmdb.putNewAmount(new ByteBufferUtility(true).byteArrayToByteBuffer(collision), Coin.ZERO);
+        }
+        return lmdbFolder;
+    }
+
+    private ConsumerJava consumePrivateKey73Against(File lmdbFolder, AddressLookupBackend backend) throws Exception {
+        CConsumerJava cConsumerJava = new CConsumerJava();
+        cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
+        cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolder.getAbsolutePath();
+        cConsumerJava.lmdbConfigurationReadOnly.addressLookupBackend = backend;
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
+        consumerJava.initLMDB();
+        consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73(), null);
+        consumerJava.consumeOneCycle(ByteBuffer.allocateDirect(OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES));
+        return consumerJava;
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = AddressLookupBackend.class,
+            names = {"LMDB_ONLY", "BLOOM", "HASHSET", "BINARY_FUSE_8", "BINARY_FUSE_16", "BLOCKED_BLOOM"})
+    public void consumeOneCycle_addressCollidingInTheFirst72Bits_isNoHitForAnExactBackend(AddressLookupBackend backend)
+            throws Exception {
+        new LMDBPlatformAssume().assumeLMDBExecution();
+        ConsumerJava consumerJava = consumePrivateKey73Against(createLmdbWithA72BitCollisionOfPrivateKey73(), backend);
+        try {
+            assertThat(consumerJava.hits.get(), is(equalTo(0L)));
+        } finally {
+            consumerJava.interrupt();
+        }
+    }
+
+    @Test
+    public void consumeOneCycle_addressCollidingInTheFirst72Bits_isAnUnverifiedHitForTruncatedLong64()
+            throws Exception {
+        // TRUNCATED_LONG_64 is self-contained by design: it compares only the first 72 bits and LMDB is
+        // closed after the snapshot is built, so a collision is reported as a hit and never verified.
+        new LMDBPlatformAssume().assumeLMDBExecution();
+        ConsumerJava consumerJava = consumePrivateKey73Against(
+                createLmdbWithA72BitCollisionOfPrivateKey73(), AddressLookupBackend.TRUNCATED_LONG_64);
+        try {
+            assertThat(consumerJava.persistence, is(nullValue()));
+            assertThat(consumerJava.hits.get(), is(equalTo(1L)));
         } finally {
             consumerJava.interrupt();
         }
@@ -421,7 +528,7 @@ public class ConsumerJavaTest {
                     arguments,
                     hasItem(
                             equalTo(
-                                    "Statistics: [uptime 0 min] [Generated 0/s (0 M total)] [-> LMDB 0/s (0 M lookups total)] [rate window 60s] [Keys per producer: none] [Producers running: 0] [Consumers running: 0] [Consumer ready for work (queue empty): 0] [Producer blocked (queue full): 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]")));
+                                    "Statistics: [uptime 0 min] [Generated 0/s (0 M total)] [-> LMDB 0/s (0 M lookups total)] [rate window 60s] [Keys per producer: none] [Producers running: 0] [Consumers running: 0] [Consumer ready for work (queue empty): 0] [Producer blocked (queue full): 0] [Average contains time: 0 ns] [keys queue size: 0] [Hits: 0]")));
         }
     }
 
@@ -445,6 +552,181 @@ public class ConsumerJavaTest {
     }
 
     // windowed-rate math moved to SlidingWindowRate; see SlidingWindowRateTest.
+
+    @Test
+    public void interrupt_batchesStillQueued_areCheckedBeforeTheConsumerStops() throws Exception {
+        // The producers stop first, then ConsumerJava.interrupt() waits awaitQueueEmptySeconds "for
+        // the worker pool to drain the keys queue". The worker loop ended on shouldRun=false without
+        // draining, so whatever was still queued -- the end of a finite range, the last lines of a
+        // secrets file -- was never checked, and a hit in it was lost.
+        new LMDBPlatformAssume().assumeLMDBExecution();
+        TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
+        TestAddressesFiles testAddresses = new TestAddressesFiles(false);
+        File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, true, true);
+
+        CConsumerJava cConsumerJava = new CConsumerJava();
+        cConsumerJava.threads = 1;
+        cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
+        cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
+        // Batch 1 must arrive through the timed poll: if the worker's non-blocking drain took it, the
+        // same drain loop would also take batch 2 after the release and the test would pass without
+        // the post-loop drain. A long timeout keeps the worker parked in that poll until batch 1 comes.
+        cConsumerJava.queuePollTimeoutMillis = 30_000L;
+        java.util.concurrent.CountDownLatch firstBatchEntered = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch releaseFirstBatch = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicInteger checkedBatches = new java.util.concurrent.atomic.AtomicInteger();
+        java.util.concurrent.atomic.AtomicReference<String> firstBatchCaller =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        net.ladenthin.bitcoinaddressfinder.core.ResultListener blockingListener = batchResult -> {
+            if (checkedBatches.incrementAndGet() == 1) {
+                firstBatchCaller.set(callerOfProcessBatch());
+            }
+            firstBatchEntered.countDown();
+            try {
+                releaseFirstBatch.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        };
+        ConsumerJava consumerJava =
+                new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils, java.util.List.of(blockingListener));
+        consumerJava.initLMDB();
+        consumerJava.startConsumer();
+        awaitWorkerParkedInTheTimedPoll(Duration.ofSeconds(10));
+
+        // the worker takes the first batch and stays inside it until released
+        consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73(), null);
+        assertThat(firstBatchEntered.await(10, java.util.concurrent.TimeUnit.SECONDS), is(true));
+        assertThat(firstBatchCaller.get(), is(equalTo("consumeOneCycle")));
+        // the second batch is still queued when the shutdown begins
+        consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73(), null);
+        Thread interrupter = new Thread(consumerJava::interrupt);
+        interrupter.start();
+        while (consumerJava.shouldRun()) {
+            Thread.onSpinWait();
+        }
+        releaseFirstBatch.countDown();
+        interrupter.join(30_000L);
+
+        assertThat(checkedBatches.get(), is(equalTo(2)));
+        assertThat(consumerJava.keysQueueSize(), is(equalTo(0)));
+    }
+
+    /**
+     * Waits until a consumer worker is parked in the timed {@code keysQueue.poll} of
+     * {@code consumeOneCycle}. The non-blocking drain poll never parks in {@code TIMED_WAITING}, so
+     * this state proves that the next batch put into the queue is taken by the timed poll.
+     */
+    private static void awaitWorkerParkedInTheTimedPoll(Duration timeout) {
+        long deadline = System.nanoTime() + timeout.toNanos();
+        while (!isAWorkerParkedInTheTimedPoll()) {
+            if (System.nanoTime() - deadline > 0) {
+                throw new AssertionError("no consumer worker parked in the timed poll within " + timeout);
+            }
+            Thread.onSpinWait();
+        }
+    }
+
+    private static boolean isAWorkerParkedInTheTimedPoll() {
+        for (Map.Entry<Thread, StackTraceElement[]> entry :
+                Thread.getAllStackTraces().entrySet()) {
+            if (entry.getKey().getState() != Thread.State.TIMED_WAITING) {
+                continue;
+            }
+            boolean inConsumeOneCycle = false;
+            boolean inQueuePoll = false;
+            for (StackTraceElement frame : entry.getValue()) {
+                inConsumeOneCycle |= frame.getClassName().equals(ConsumerJava.class.getName())
+                        && frame.getMethodName().equals("consumeOneCycle");
+                inQueuePoll |= frame.getClassName().equals("java.util.concurrent.LinkedBlockingQueue")
+                        && frame.getMethodName().equals("poll");
+            }
+            if (inConsumeOneCycle && inQueuePoll) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Names the {@link ConsumerJava} method that called {@code processBatch} on the current thread:
+     * {@code consumeOneCycle} for a batch from the timed poll, {@code consumeKeys} for one from the
+     * non-blocking drain.
+     */
+    private static String callerOfProcessBatch() {
+        List<String> consumerFrames = StackWalker.getInstance()
+                .walk(frames -> frames.filter(frame -> frame.getClassName().equals(ConsumerJava.class.getName()))
+                        .map(StackWalker.StackFrame::getMethodName)
+                        .toList());
+        int processBatch = consumerFrames.indexOf("processBatch");
+        if (processBatch < 0 || processBatch + 1 >= consumerFrames.size()) {
+            return "not called from processBatch: " + consumerFrames;
+        }
+        return consumerFrames.get(processBatch + 1);
+    }
+
+    @Test
+    public void interrupt_awaitTimesOut_batchCheckedAfterThePersistenceClosedIsNotReportedAsChecked() throws Exception {
+        // When awaitQueueEmptySeconds runs out, interrupt() closes the persistence while a worker is
+        // still busy. A lookup on a closed LMDB answers "absent", so every batch the worker checks
+        // afterwards was reported as "checked, nothing found" -- a hit in it was lost, and a client
+        // sweeping a range took it as done.
+        new LMDBPlatformAssume().assumeLMDBExecution();
+        TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
+        TestAddressesFiles testAddresses = new TestAddressesFiles(false);
+        File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, true, true);
+
+        CConsumerJava cConsumerJava = new CConsumerJava();
+        cConsumerJava.threads = 1;
+        cConsumerJava.awaitQueueEmptySeconds = 1L;
+        cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
+        cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
+        java.util.concurrent.CountDownLatch firstBatchEntered = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch releaseFirstBatch = new java.util.concurrent.CountDownLatch(1);
+        java.util.List<net.ladenthin.bitcoinaddressfinder.core.BatchResult> reported =
+                new java.util.concurrent.CopyOnWriteArrayList<>();
+        net.ladenthin.bitcoinaddressfinder.core.ResultListener blockingListener = batchResult -> {
+            reported.add(batchResult);
+            firstBatchEntered.countDown();
+            try {
+                releaseFirstBatch.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        };
+        ConsumerJava consumerJava =
+                new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils, java.util.List.of(blockingListener));
+        consumerJava.initLMDB();
+        consumerJava.startConsumer();
+
+        consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73(), BigInteger.ONE);
+        assertThat(firstBatchEntered.await(10, java.util.concurrent.TimeUnit.SECONDS), is(true));
+        // the second batch holds an address of the database and is still queued
+        ECKey keyInDatabase = new TestAddresses42(1, false).getECKeys().get(0);
+        PublicKeyBytes[] batchWithHit = {PublicKeyBytes.fromPrivate(keyInDatabase.getPrivKey())};
+        consumerJava.consumeKeys(batchWithHit, BigInteger.TWO);
+
+        // the worker is still inside batch 1, so the await times out and the persistence is closed
+        consumerJava.interrupt();
+        releaseFirstBatch.countDown();
+        // wait until the worker has drained batch 2 and ended
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10);
+        while (consumerJava.runningConsumerCount() > 0 && System.nanoTime() < deadline) {
+            Thread.onSpinWait();
+        }
+        assertThat(consumerJava.runningConsumerCount(), is(equalTo(0L)));
+        assertThat(consumerJava.keysQueueSize(), is(equalTo(0)));
+
+        // batch 1 was checked before the close; batch 2 must not be claimed as "checked, nothing found"
+        java.util.List<String> emptyBatch2 = new java.util.ArrayList<>();
+        for (net.ladenthin.bitcoinaddressfinder.core.BatchResult batchResult : reported) {
+            if (BigInteger.TWO.equals(batchResult.secretBase())
+                    && batchResult.hits().isEmpty()) {
+                emptyBatch2.add(batchResult.toString());
+            }
+        }
+        assertThat(emptyBatch2, is(equalTo(java.util.List.of())));
+    }
 
     @AwaitTimeTest
     @Test

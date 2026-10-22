@@ -8,9 +8,12 @@ import static org.hamcrest.Matchers.*;
 import static org.hamcrest.Matchers.equalTo;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.AppenderBase;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
@@ -38,6 +41,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.slf4j.LoggerFactory;
 
 /**
  * Direct unit tests for {@link AddressFilesToLMDB}.
@@ -277,6 +281,187 @@ public class AddressFilesToLMDBTest extends LMDBBase {
             }
         } finally {
             lmdb.close();
+        }
+    }
+
+    /** Windows editors write UTF-8 with a leading byte order mark; the first address must still be imported. */
+    @Test
+    public void addressFilesToLMDB_fileWithUtf8ByteOrderMark_importsTheFirstAddress() throws Exception {
+        List<String> addresses = base58P2PKHAddresses();
+        File file = folder.resolve("bom.txt").toFile();
+        byte[] bom = {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
+        byte[] body = String.join("\n", addresses).getBytes(StandardCharsets.UTF_8);
+        byte[] content = new byte[bom.length + body.length];
+        System.arraycopy(bom, 0, content, 0, bom.length);
+        System.arraycopy(body, 0, content, bom.length, body.length);
+        Files.write(file.toPath(), content);
+
+        File lmdbDir = runImport(1, true, List.of(file.getAbsolutePath()), "bom");
+
+        LMDBPersistence lmdb = openReadOnly(lmdbDir);
+        try {
+            assertThat(
+                    "the first address after the byte order mark was not imported",
+                    lmdb.containsAddress(P2PKH.values()[0].getPublicKeyHashAsByteBuffer()),
+                    is(true));
+            assertThat(lmdb.count(), is(equalTo((long) addresses.size())));
+        } finally {
+            lmdb.close();
+        }
+    }
+
+    /**
+     * Unusable amounts keep their addresses with the default amount, and the import says so once, with
+     * the number of affected lines and the first one, instead of storing them silently.
+     */
+    @Test
+    public void addressFilesToLMDB_unusableAmounts_warnsOnceAndStoresTheDefault() throws Exception {
+        P2PKH[] keys = P2PKH.values();
+        File file = folder.resolve("amounts.txt").toFile();
+        Files.write(
+                file.toPath(),
+                List.of(
+                        keys[0].getPublicAddress() + ",1.5",
+                        keys[1].getPublicAddress() + ",-5",
+                        keys[2].getPublicAddress() + ",abc",
+                        keys[3].getPublicAddress() + ",42"));
+
+        File lmdbDir;
+        try (LogCaptor logCaptor = LogCaptor.forClass(AddressFilesToLMDB.class)) {
+            lmdbDir = runImport(1, false, List.of(file.getAbsolutePath()), "amounts");
+
+            List<String> amountWarnings = logCaptor.getWarnLogs().stream()
+                    .filter(w -> w.contains("amount"))
+                    .toList();
+            assertThat(amountWarnings, hasSize(1));
+            assertThat(amountWarnings.get(0), containsString("3 line(s)"));
+            assertThat(amountWarnings.get(0), containsString(keys[0].getPublicAddress() + ",1.5"));
+        }
+
+        LMDBPersistence lmdb = openReadOnly(lmdbDir);
+        try {
+            assertThat(lmdb.getAmount(keys[1].getPublicKeyHashAsByteBuffer()), is(equalTo(Coin.SATOSHI)));
+            assertThat(lmdb.getAmount(keys[3].getPublicKeyHashAsByteBuffer()), is(equalTo(Coin.valueOf(42))));
+        } finally {
+            lmdb.close();
+        }
+    }
+
+    /**
+     * The header line of a Blockchair export is rejected, not imported, so it is no line with an
+     * unusable amount; an import of such a file must not warn.
+     */
+    @Test
+    public void addressFilesToLMDB_blockchairHeaderLine_noAmountWarning() throws Exception {
+        P2PKH[] keys = P2PKH.values();
+        File file = folder.resolve("blockchair.tsv").toFile();
+        Files.write(file.toPath(), List.of("address\tbalance", keys[0].getPublicAddress() + "\t42"));
+
+        try (LogCaptor logCaptor = LogCaptor.forClass(AddressFilesToLMDB.class)) {
+            runImport(1, false, List.of(file.getAbsolutePath()), "blockchair-header");
+
+            assertThat(
+                    logCaptor.getWarnLogs().stream()
+                            .filter(w -> w.contains("amount"))
+                            .toList(),
+                    is(empty()));
+        }
+    }
+
+    /**
+     * With {@code useStaticAmount} (the default) the amount column is not used at all: every address
+     * is stored with {@code staticAmount}. An unusable amount there changes nothing, so there is
+     * nothing to warn about — and the old text, "stored with the default amount of 1 satoshi", was
+     * wrong in that mode.
+     */
+    @Test
+    public void addressFilesToLMDB_unusableAmountWithStaticAmount_noWarningAndTheStaticAmountIsStored()
+            throws Exception {
+        P2PKH[] keys = P2PKH.values();
+        File file = folder.resolve("static-amounts.txt").toFile();
+        Files.write(file.toPath(), List.of(keys[0].getPublicAddress() + ",-5"));
+
+        File lmdbDir;
+        try (LogCaptor logCaptor = LogCaptor.forClass(AddressFilesToLMDB.class)) {
+            lmdbDir = runImport(1, true, List.of(file.getAbsolutePath()), "static-amounts");
+
+            assertThat(
+                    logCaptor.getWarnLogs().stream()
+                            .filter(w -> w.contains("amount"))
+                            .toList(),
+                    is(empty()));
+        }
+        LMDBPersistence lmdb = openReadOnly(lmdbDir);
+        try {
+            assertThat(lmdb.getAmount(keys[0].getPublicKeyHashAsByteBuffer()), is(equalTo(Coin.ZERO)));
+        } finally {
+            lmdb.close();
+        }
+    }
+
+    /** An import stopped by {@code interrupt()} leaves an incomplete database and must not be reported as done. */
+    @Test
+    public void addressFilesToLMDB_interruptedBeforeTheImport_doesNotReportTheImportAsDone() throws Exception {
+        List<String> files = writeAddressFilesRoundRobin(base58P2PKHAddresses(), 2, "interrupted");
+        CAddressFilesToLMDB config = new CAddressFilesToLMDB();
+        config.addressesFiles.addAll(files);
+        config.lmdbConfigurationWrite = new CLMDBConfigurationWrite();
+        File lmdbFolder =
+                Files.createDirectory(folder.resolve("lmdb-interrupted")).toFile();
+        config.lmdbConfigurationWrite.lmdbDirectory = lmdbFolder.getAbsolutePath();
+        AddressFilesToLMDB importer = new AddressFilesToLMDB(config);
+        importer.interrupt();
+
+        try (LogCaptor logCaptor = LogCaptor.forClass(AddressFilesToLMDB.class)) {
+            importer.run();
+
+            assertThat(logCaptor.getInfoLogs(), not(hasItem("... import done.")));
+            assertThat(logCaptor.getWarnLogs(), hasItem(startsWith("... import interrupted")));
+        }
+    }
+
+    /**
+     * An import interrupted while a file is being read reports that file as interrupted, not as
+     * finished. A log hook clears the run flag on the {@code "process <path>"} line, which the reader
+     * logs right before it reads the file, so the reader leaves the file at its first loop check:
+     * deterministic, without a second thread or a large file.
+     */
+    @Test
+    public void addressFilesToLMDB_interruptedWhileReading_reportsTheFileAsInterruptedNotFinished() throws Exception {
+        List<String> files = writeAddressFilesRoundRobin(base58P2PKHAddresses(), 1, "interrupted-reading");
+        CAddressFilesToLMDB config = new CAddressFilesToLMDB();
+        config.addressesFiles.addAll(files);
+        config.lmdbConfigurationWrite = new CLMDBConfigurationWrite();
+        File lmdbFolder = Files.createDirectory(folder.resolve("lmdb-interrupted-reading"))
+                .toFile();
+        config.lmdbConfigurationWrite.lmdbDirectory = lmdbFolder.getAbsolutePath();
+        AddressFilesToLMDB importer = new AddressFilesToLMDB(config);
+
+        ch.qos.logback.classic.Logger logger =
+                (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(AddressFilesToLMDB.class);
+        AppenderBase<ILoggingEvent> interruptOnProcess = new AppenderBase<>() {
+            @Override
+            protected void append(ILoggingEvent event) {
+                if (event.getFormattedMessage().startsWith("process ")) {
+                    importer.interrupt();
+                }
+            }
+        };
+        try (LogCaptor logCaptor = LogCaptor.forClass(AddressFilesToLMDB.class)) {
+            interruptOnProcess.setContext(logger.getLoggerContext());
+            interruptOnProcess.start();
+            logger.addAppender(interruptOnProcess);
+            try {
+                importer.run();
+            } finally {
+                logger.detachAppender(interruptOnProcess);
+                interruptOnProcess.stop();
+            }
+
+            assertThat(logCaptor.getInfoLogs(), hasItem(startsWith("process ")));
+            assertThat(logCaptor.getWarnLogs(), hasItem(startsWith("interrupted while reading ")));
+            assertThat(logCaptor.getInfoLogs(), not(hasItem(startsWith("finished ("))));
+            assertThat(logCaptor.getInfoLogs(), not(hasItem("... import done.")));
         }
     }
 

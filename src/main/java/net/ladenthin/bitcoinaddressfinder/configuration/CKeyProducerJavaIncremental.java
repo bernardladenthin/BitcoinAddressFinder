@@ -21,8 +21,11 @@ public class CKeyProducerJavaIncremental extends CKeyProducerJava {
 
     /** Inclusive lower bound of the scanned private-key range as an uppercase hex string. */
     public String startPrivateKey = Secp256k1Constants.MIN_VALID_PRIVATE_KEY_HEX;
-    /** Inclusive upper bound of the scanned private-key range as a hex string. */
-    public String endPrivateKey = Secp256k1Constants.MAX_PRIVATE_KEY_HEX;
+    /**
+     * Inclusive upper bound of the scanned private-key range as a hex string; by default the last valid
+     * key, {@code n - 1} (the group order {@code n} itself is not a key).
+     */
+    public String endPrivateKey = Secp256k1Constants.MAX_VALID_PRIVATE_KEY_HEX;
 
     /**
      * Returns the configured inclusive lower bound of the scanned private-key range.

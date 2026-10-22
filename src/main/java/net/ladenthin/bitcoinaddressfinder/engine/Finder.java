@@ -97,11 +97,24 @@ public class Finder implements Interruptable {
     private final ExecutorService producerExecutorService;
 
     /**
-     * Result broadcasters built from the configured key producers, kept so the grid configuration
-     * can be announced to them once the producers are known and so they can be closed on shutdown.
+     * Result broadcasters built from the configured key producers, each with the id of the key
+     * producer it belongs to, kept so the grid configuration can be announced to them once the
+     * producers are known.
      */
     @ToString.Exclude
-    private final List<ResultBroadcaster> resultBroadcasters = new ArrayList<>();
+    private final List<KeyedResultBroadcaster> resultBroadcasters = new ArrayList<>();
+
+    /**
+     * A result broadcaster and the key producer whose clients it serves.
+     *
+     * @param keyProducerId the id of the key producer the broadcaster's clients send bases to
+     * @param broadcaster   the broadcaster
+     */
+    private record KeyedResultBroadcaster(String keyProducerId, ResultBroadcaster broadcaster) {}
+
+    /** WebSocket broadcasters, kept so the key producer's endpoint they took over can be stopped on shutdown. */
+    @ToString.Exclude
+    private final List<WebSocketResultBroadcaster> webSocketBroadcasters = new ArrayList<>();
 
     /** ZeroMQ publishers, kept so their context can be closed on shutdown. */
     @ToString.Exclude
@@ -113,6 +126,42 @@ public class Finder implements Interruptable {
 
     /** Guarantees each producer is released exactly once, even when two teardowns overlap. */
     private final ProducerReleaser producerReleaser = new ProducerReleaser();
+
+    /**
+     * Serializes {@link #interrupt()} and {@link #closeBroadcasters()}: the JVM shutdown hook and
+     * {@link #shutdownAndAwaitTermination()} both reach them, at the same time after a Ctrl-C, and they
+     * walk and clear plain lists.
+     */
+    @ToString.Exclude
+    private final Object interruptLock = new Object();
+
+    /**
+     * Set by {@link #interrupt()}, before it takes {@link #interruptLock}. A {@code Ctrl+C} usually
+     * lands while the startup is still running, most often while the consumer loads its database; the
+     * interrupt then releases what exists so far, and the startup steps that follow check this flag
+     * instead of building on the released state (a freed key producer would otherwise surface as an
+     * unknown key producer id).
+     *
+     * <p>The steps that register, initialise and start a producer check it under the lock, per
+     * producer: the interrupt walks and clears the producer lists under the same lock, so a producer
+     * either joins before that walk and is released by it, or is never registered, initialised or
+     * started. Set before the lock is taken because monitors are not fair: a startup step that frees
+     * the lock after one producer and takes it again for the next would otherwise get ahead of the
+     * shutdown hook already waiting for it, and the flag is what makes it stop instead.
+     */
+    private volatile boolean interrupted;
+
+    /** Test seam: listeners added to the consumer's result listeners next to the broadcasters. */
+    @ToString.Exclude
+    private final List<ResultListener> additionalResultListeners = new ArrayList<>();
+
+    /** Test seam: runs in {@link #closeBroadcasters()} right before the result broadcasters close. */
+    @ToString.Exclude
+    private volatile Runnable beforeResultBroadcastersClosed = () -> {};
+
+    /** Test seam: runs in {@link #configureProducer()} right before a producer is registered, with that producer. */
+    @ToString.Exclude
+    private volatile java.util.function.Consumer<Producer> beforeProducerRegistered = producer -> {};
 
     private final KeyUtility keyUtility;
     private final PersistenceUtils persistenceUtils;
@@ -147,7 +196,11 @@ public class Finder implements Interruptable {
     }
 
     /**
-     * Instantiates and registers every configured key producer.
+     * Instantiates and registers every configured key producer, then checks that every configured
+     * producer names one of them and has a valid batch size.
+     *
+     * @throws KeyProducerIdUnknownException if a producer names no configured key producer
+     * @throws IllegalArgumentException if a producer's {@code batchSizeInBits} is out of range
      */
     public void startKeyProducer() {
         LOGGER.info("startKeyProducer");
@@ -188,6 +241,29 @@ public class Finder implements Interruptable {
                 cKeyProducerJavaZmq -> new KeyProducerJavaZmq(cKeyProducerJavaZmq, keyUtility, bitHelper),
                 cKeyProducerJavaZmq -> cKeyProducerJavaZmq.keyProducerId,
                 keyProducers);
+
+        validateProducerConfiguration();
+    }
+
+    /**
+     * Checks what {@link #configureProducer()} will check, while it is still cheap to fail.
+     *
+     * <p>The consumer starts between the two, and its database load is the long step of the startup:
+     * a typo in a producer's {@code keyProducerId} or an out-of-range {@code batchSizeInBits} would
+     * otherwise surface only after it.
+     *
+     * @throws KeyProducerIdUnknownException if a producer names no configured key producer
+     * @throws IllegalArgumentException if a producer's {@code batchSizeInBits} is out of range
+     */
+    private void validateProducerConfiguration() {
+        final List<CProducer> producerConfigurations = new ArrayList<>();
+        producerConfigurations.addAll(finder.producerJava);
+        producerConfigurations.addAll(finder.producerJavaSecretsFiles);
+        producerConfigurations.addAll(finder.producerOpenCL);
+        for (CProducer cProducer : producerConfigurations) {
+            bitHelper.assertBatchSizeInBitsIsInRange(cProducer.batchSizeInBits);
+            getKeyProducer(cProducer);
+        }
     }
 
     private <T, K> void processKeyProducers(
@@ -218,13 +294,17 @@ public class Finder implements Interruptable {
     }
 
     /**
-     * Initialises and starts the {@link ConsumerJava}.
+     * Initialises and starts the {@link ConsumerJava}; does nothing once {@link #interrupt()} ran.
      *
-     * @throws Exception if the consumer's LMDB layer cannot be opened or the
-     *     accelerator snapshot cannot be built
+     * @throws Exception if the consumer's LMDB layer cannot be opened, the
+     *     accelerator snapshot cannot be built, or a result server cannot bind its port
      */
     public void startConsumer() throws Exception {
         LOGGER.info("startConsumer");
+        if (interrupted) {
+            LOGGER.info("startConsumer skipped: interrupted");
+            return;
+        }
         CConsumerJava localCConsumerJava = Objects.requireNonNull(finder.consumerJava);
 
         final ConsumerJava localConsumerJava = new ConsumerJava(
@@ -247,13 +327,47 @@ public class Finder implements Interruptable {
      * consumer sees nothing but the {@code ResultListener} contract.
      *
      * @return the listeners to notify for every checked batch, possibly empty
+     * @throws IOException if a socket key producer's result server cannot bind its port
      */
-    private List<ResultListener> createResultListeners() {
+    private List<ResultListener> createResultListeners() throws IOException {
         final List<ResultListener> listeners = new ArrayList<>();
         addWebSocketBroadcasters(listeners);
         addZmqBroadcasters(listeners);
         addSocketBroadcasters(listeners);
+        listeners.addAll(additionalResultListeners);
         return listeners;
+    }
+
+    /**
+     * Adds a listener the consumer notifies next to the configured broadcasters; must be called
+     * before {@link #startConsumer()}.
+     *
+     * @param listener the listener to add
+     */
+    @VisibleForTesting
+    void addResultListener(ResultListener listener) {
+        additionalResultListeners.add(listener);
+    }
+
+    /**
+     * Installs the hook that runs in {@link #closeBroadcasters()} right before the result broadcasters
+     * are closed.
+     *
+     * @param hook the code to run
+     */
+    @VisibleForTesting
+    void setBeforeResultBroadcastersClosed(Runnable hook) {
+        this.beforeResultBroadcastersClosed = hook;
+    }
+
+    /**
+     * Installs the hook that runs in {@link #configureProducer()} right before a producer is registered.
+     *
+     * @param hook the code to run, given the producer about to be registered
+     */
+    @VisibleForTesting
+    void setBeforeProducerRegistered(java.util.function.Consumer<Producer> hook) {
+        this.beforeProducerRegistered = hook;
     }
 
     /**
@@ -282,8 +396,9 @@ public class Finder implements Interruptable {
                 continue;
             }
             final WebSocketResultBroadcaster broadcaster =
-                    new WebSocketResultBroadcaster(webSocketKeyProducer.getEndpoint());
-            resultBroadcasters.add(broadcaster::announceConfiguration);
+                    new WebSocketResultBroadcaster(webSocketKeyProducer.shareEndpoint());
+            resultBroadcasters.add(new KeyedResultBroadcaster(keyProducerId, broadcaster::announceConfiguration));
+            webSocketBroadcasters.add(broadcaster);
             listeners.add(broadcaster);
             LOGGER.info("Broadcasting results on the WebSocket of keyProducerId {}", keyProducerId);
         }
@@ -302,7 +417,7 @@ public class Finder implements Interruptable {
                 continue;
             }
             final ZmqResultBroadcaster broadcaster = new ZmqResultBroadcaster(config.publishAddress);
-            resultBroadcasters.add(broadcaster::announceConfiguration);
+            addForAnnouncement(config.keyProducerId, broadcaster::announceConfiguration);
             zmqBroadcasters.add(broadcaster);
             listeners.add(broadcaster);
             LOGGER.info("Publishing results on {}", config.publishAddress);
@@ -315,9 +430,15 @@ public class Finder implements Interruptable {
      * <p>Serves on a port of its own, because the inbound side handles a single peer with a
      * different framing.
      *
+     * <p>A port that cannot be bound fails the start, as the key producer's own port does and as a
+     * ZeroMQ publisher's address does: continuing without the result server would leave its clients
+     * without a single batch report while the run still ended with exit 0.
+     *
      * @param listeners the list to add to
+     * @throws IOException if a result server cannot bind its port; the message names the key producer
+     *                     and the port
      */
-    private void addSocketBroadcasters(List<ResultListener> listeners) {
+    private void addSocketBroadcasters(List<ResultListener> listeners) throws IOException {
         for (CKeyProducerJavaSocket config : finder.keyProducerJavaSocket) {
             if (!config.broadcastResults) {
                 continue;
@@ -326,12 +447,27 @@ public class Finder implements Interruptable {
             try {
                 broadcaster.start();
             } catch (IOException e) {
-                LOGGER.error("Could not serve results on port {}; continuing without it.", config.resultPort, e);
-                continue;
+                throw new IOException(
+                        "The socket key producer " + config.keyProducerId + " cannot serve results on port "
+                                + config.resultPort + ": " + e.getMessage(),
+                        e);
             }
-            resultBroadcasters.add(broadcaster::announceConfiguration);
+            addForAnnouncement(config.keyProducerId, broadcaster::announceConfiguration);
             socketBroadcasters.add(broadcaster);
             listeners.add(broadcaster);
+        }
+    }
+
+    /**
+     * Keeps a broadcaster for the grid announcement.
+     *
+     * @param keyProducerId the id of the key producer the broadcaster belongs to; {@code null} never
+     *                      started a key producer ({@link #startKeyProducer()} rejects it)
+     * @param broadcaster   the broadcaster
+     */
+    private void addForAnnouncement(@Nullable String keyProducerId, ResultBroadcaster broadcaster) {
+        if (keyProducerId != null) {
+            resultBroadcasters.add(new KeyedResultBroadcaster(keyProducerId, broadcaster));
         }
     }
 
@@ -343,8 +479,11 @@ public class Finder implements Interruptable {
      * incoming base is aligned down to a multiple of {@code 2^batchSizeInBits}, so a client stepping
      * by less would resubmit the same block and never cover the rest of its range.
      *
-     * <p>When producers disagree on the grid size the largest is announced, which is the only choice
-     * that cannot make ranges overlap.
+     * <p>Each broadcaster is told the grid of the producers its own key producer feeds; producers on
+     * other key producers never see its bases. When those producers disagree, the smallest grid is
+     * announced: each base goes to one of them, so a larger step would leave the rest of the block
+     * unchecked by a producer with a smaller grid, while a smaller step only makes a producer with a
+     * larger grid, which aligns the base down, check its block more than once.
      */
     private void announceGridConfigurationToBroadcasters() {
         if (resultBroadcasters.isEmpty()) {
@@ -354,14 +493,31 @@ public class Finder implements Interruptable {
         if (allProducers.isEmpty()) {
             return;
         }
-        int batchSizeInBits = 0;
-        boolean batchUsePrivateKeyIncrement = true;
-        for (CProducer cProducer : configuredProducerConfigs()) {
-            batchSizeInBits = Math.max(batchSizeInBits, cProducer.batchSizeInBits);
-            batchUsePrivateKeyIncrement &= cProducer.batchUsePrivateKeyIncrement;
-        }
-        for (ResultBroadcaster broadcaster : resultBroadcasters) {
-            broadcaster.announceConfiguration(batchSizeInBits, batchUsePrivateKeyIncrement);
+        for (KeyedResultBroadcaster entry : resultBroadcasters) {
+            final SortedSet<Integer> gridSizes = new TreeSet<>();
+            boolean batchUsePrivateKeyIncrement = true;
+            for (CProducer cProducer : configuredProducerConfigs()) {
+                if (entry.keyProducerId().equals(cProducer.keyProducerId)) {
+                    gridSizes.add(cProducer.batchSizeInBits);
+                    batchUsePrivateKeyIncrement &= cProducer.batchUsePrivateKeyIncrement;
+                }
+            }
+            if (gridSizes.isEmpty()) {
+                LOGGER.warn(
+                        "Results are broadcast for keyProducerId {}, but no producer draws from it;"
+                                + " no grid is announced.",
+                        entry.keyProducerId());
+                continue;
+            }
+            if (gridSizes.size() > 1) {
+                LOGGER.warn(
+                        "The producers fed by keyProducerId {} use different grids (batchSizeInBits {});"
+                                + " announcing the smallest, so the producers with a larger grid check"
+                                + " their blocks more than once.",
+                        entry.keyProducerId(),
+                        gridSizes);
+            }
+            entry.broadcaster().announceConfiguration(gridSizes.first(), batchUsePrivateKeyIncrement);
         }
     }
 
@@ -437,10 +593,21 @@ public class Finder implements Interruptable {
     }
 
     /**
-     * Builds the configured producers and binds them to their key producer and consumer.
+     * Builds the configured producers and binds them to their key producer and consumer; does nothing
+     * once {@link #interrupt()} ran, which has already released the key producers.
+     *
+     * <p>Each producer is registered under {@link #interruptLock}, and not at all once the interrupt
+     * ran: it then releases the producer it built instead, because an interrupt that overtook the
+     * registration has walked the producer lists already and nothing else would release it. The
+     * producers after that one are not built either: the interrupt has freed the key producers, and
+     * their lookup would report a freed one as unknown instead of the clean end of an interrupted start.
      */
     public void configureProducer() {
         LOGGER.info("configureProducer");
+        if (interrupted) {
+            LOGGER.info("configureProducer skipped: interrupted");
+            return;
+        }
         var localConsumerJava = Objects.requireNonNull(consumerJava);
         processProducers(
                 finder.producerJava,
@@ -601,7 +768,7 @@ public class Finder implements Interruptable {
                 data.segmentCountLength());
     }
 
-    private <T extends CProducer, P> void processProducers(
+    private <T extends CProducer, P extends Producer> void processProducers(
             Iterable<T> configs,
             java.util.function.Consumer<Integer> batchSizeAssert,
             Function<T, KeyProducer> getKeyProducer,
@@ -609,10 +776,28 @@ public class Finder implements Interruptable {
             Collection<P> targetCollection) {
         if (configs != null) {
             for (T config : configs) {
+                if (interrupted) {
+                    // The interrupt has freed the key producers: the lookup below would report one of
+                    // them as unknown (the error of F124) where the start is simply over.
+                    LOGGER.info("configureProducer stopped: interrupted");
+                    return;
+                }
                 batchSizeAssert.accept(config.batchSizeInBits);
                 KeyProducer keyProducer = getKeyProducer.apply(config);
                 P producer = producerConstructor.apply(config, keyProducer);
-                targetCollection.add(producer);
+                // Check-and-act under the lock the interrupt walks the lists under: a producer that
+                // joined the list after the interrupt's walk would never be released.
+                synchronized (interruptLock) {
+                    beforeProducerRegistered.accept(producer);
+                    if (interrupted) {
+                        LOGGER.info(
+                                "configureProducer: interrupted, the producer is released and not registered: {}",
+                                producer);
+                        producer.releaseProducer();
+                        return;
+                    }
+                    targetCollection.add(producer);
+                }
             }
         }
     }
@@ -637,7 +822,12 @@ public class Finder implements Interruptable {
     }
 
     /**
-     * Calls {@code initProducer()} on every configured producer.
+     * Calls {@code initProducer()} on every configured producer; stops once {@link #interrupt()} ran.
+     *
+     * <p>Each producer is initialised under {@link #interruptLock}, so an interrupt waits for the
+     * initialisation in progress (an OpenCL producer creates its context there) and releases that
+     * producer along with the others; the next producer is then not initialised, since nothing would
+     * release it afterwards.
      *
      * @throws Exception if any producer fails to initialise; the orchestrator does not
      *                   catch this here, the Main run loop is the architectural place
@@ -646,13 +836,26 @@ public class Finder implements Interruptable {
     public void initProducer() throws Exception {
         LOGGER.info("initProducer");
         for (Producer producer : getAllProducers()) {
-            producer.initProducer();
+            synchronized (interruptLock) {
+                if (interrupted) {
+                    LOGGER.info("initProducer stopped: interrupted");
+                    return;
+                }
+                producer.initProducer();
+            }
         }
     }
 
     /**
-     * Submits every configured producer to the producer executor service.
+     * Submits every configured producer to the producer executor service; stops once
+     * {@link #interrupt()} ran.
+     *
+     * <p>Each producer is submitted under {@link #interruptLock}, so it is either submitted before the
+     * interrupt's walk of the producer lists, which then stops it, or not at all: a producer submitted
+     * after that walk would run with its run flag set and nothing left to clear it.
      */
+    @FireAndForget("lifecycle via Producer.interrupt() and Finder.interrupt() shutdown")
+    @SuppressWarnings("FutureReturnValueIgnored")
     public void startProducer() {
         LOGGER.info("startProducer");
         // Late-bind the running-producer gauge now that the producers exist (the consumer's
@@ -661,14 +864,87 @@ public class Finder implements Interruptable {
                 .filter(producer -> producer.getState() == ProducerState.RUNNING)
                 .count());
         for (Producer producer : getAllProducers()) {
-            @FireAndForget("lifecycle via Producer.interrupt() and Finder.interrupt() shutdown")
-            @SuppressWarnings("FutureReturnValueIgnored")
-            Object unused = producerExecutorService.submit(producer);
+            synchronized (interruptLock) {
+                if (interrupted) {
+                    LOGGER.info("startProducer stopped: interrupted");
+                    return;
+                }
+                producerExecutorService.submit(producer);
+            }
         }
     }
 
     /**
-     * Shuts down the producer executor and interrupts the consumer once producers have stopped.
+     * How long this finder's shutdown can take after {@link #interrupt()} has returned, in seconds. The
+     * JVM shutdown hook of {@code Main} waits at least this long for the run to end before the JVM
+     * halts; it used to wait a flat 30 s, which the default configuration exceeds by design.
+     *
+     * <p>{@link #interrupt()} stops the sources and the producers and returns. The main thread then
+     * lets the consumer check what is still queued, for up to {@code consumerJava.awaitQueueEmptySeconds},
+     * and closes the result broadcasters one after the other, each of which waits for what is still
+     * queued for its clients: a socket result server for at most
+     * {@link SocketResultBroadcaster#CLOSE_DRAIN_MILLIS}, a ZeroMQ publisher for at most
+     * {@link ZmqResultBroadcaster#LINGER_MILLIS}. A WebSocket broadcaster stops the key producer's
+     * server, whose stop has no bound of its own -- it joins the server's selector thread, which ends as
+     * soon as it sees the stop -- so it counts nothing here. A hook that waited less than this sum
+     * halted the JVM in the middle of the drain: the remaining batches stayed unchecked and the reports
+     * queued for the clients never left.
+     *
+     * <p>Nothing validates {@code awaitQueueEmptySeconds}: a negative value, which makes the consumer's
+     * own wait return at once, counts as no drain, and a value near {@link Long#MAX_VALUE} ("never give
+     * up") saturates instead of wrapping into a negative budget, which the hook would turn into an
+     * immediate halt.
+     *
+     * @param finder the finder configuration
+     * @return the seconds the shutdown can take after the interrupt, the milliseconds rounded up
+     */
+    public static long shutdownBudgetSeconds(CFinder finder) {
+        final CConsumerJava localCConsumerJava = finder.consumerJava;
+        final long queueDrainSeconds =
+                localCConsumerJava == null ? 0L : Math.max(0L, localCConsumerJava.awaitQueueEmptySeconds);
+        long broadcasterCloseMillis = 0L;
+        for (CKeyProducerJavaSocket config : finder.keyProducerJavaSocket) {
+            if (config.broadcastResults) {
+                broadcasterCloseMillis += SocketResultBroadcaster.CLOSE_DRAIN_MILLIS;
+            }
+        }
+        for (CKeyProducerJavaZmq config : finder.keyProducerJavaZmq) {
+            if (config.broadcastResults) {
+                broadcasterCloseMillis += ZmqResultBroadcaster.LINGER_MILLIS;
+            }
+        }
+        final long broadcasterCloseSeconds = wholeSecondsRoundedUp(broadcasterCloseMillis);
+        if (queueDrainSeconds > Long.MAX_VALUE - broadcasterCloseSeconds) {
+            return Long.MAX_VALUE;
+        }
+        return queueDrainSeconds + broadcasterCloseSeconds;
+    }
+
+    /**
+     * Converts milliseconds to whole seconds, rounding up: the hook waits whole seconds, and a fraction
+     * rounded down would let it halt the JVM inside that fraction.
+     *
+     * @param millis the duration in milliseconds
+     * @return the duration in whole seconds, rounded up
+     */
+    @VisibleForTesting
+    static long wholeSecondsRoundedUp(long millis) {
+        return Math.ceilDiv(millis, TimeUnit.SECONDS.toMillis(1));
+    }
+
+    /**
+     * Shuts down the producer executor, lets the consumer check what the producers queued, then
+     * releases the key producers, broadcasters and producers.
+     *
+     * <p>The result broadcasters close last, after the consumer has been released, on both branches
+     * and also when a {@code Ctrl+C} lands meanwhile: the shutdown hook's {@link #interrupt()} stops the
+     * sources and the producers, and leaves the broadcasters to this method.
+     *
+     * <p>A thread interrupt during the wait for the producers runs the same teardown as a wait that
+     * timed out, and only then propagates: the producers may still be running, and the caller's
+     * {@link #interrupt()} releases neither the consumer nor the broadcasters, whose non-daemon threads
+     * would keep the JVM alive. The teardown runs with the interrupt status clear, as the exception
+     * leaves it, so that it can wait for the producers to stop.
      *
      * @throws InterruptedException if the calling thread is interrupted while awaiting termination;
      *                              callers are responsible for restoring the interrupt flag or
@@ -677,7 +953,6 @@ public class Finder implements Interruptable {
     public void shutdownAndAwaitTermination() throws InterruptedException {
         LOGGER.info("shutdownAndAwaitTermination");
         producerExecutorService.shutdown();
-        producerExecutorService.awaitTermination(finder.awaitTerminateSeconds, TimeUnit.SECONDS);
 
         // The producers have stopped, but stopping them does not release what they own: a
         // ProducerOpenCL still holds its result-reader pool, and the key producers still hold the
@@ -690,9 +965,76 @@ public class Finder implements Interruptable {
         // already ended, so the release that would end them would never be reached. The teardown
         // therefore belongs here, on the completion path itself. interrupt() is idempotent (it frees
         // the collections it walks), so the hook calling it again later is harmless.
-        interrupt();
+        //
+        // When the producers have ended, the consumer goes first: it may still be checking what they
+        // queued, and it reports every checked batch to the result broadcasters that
+        // closeBroadcasters() closes. Closed first, the last batches of a run -- the completion signal a client waits
+        // for -- reached nobody. When the wait timed out instead, producers are still running and
+        // filling the queue; they have to be stopped first, or a producer blocked on the full queue
+        // of a stopped consumer would hold interrupt() for its whole shutdownTimeoutSeconds (plus the
+        // one-second grace of waitTillProducerNotRunning).
+        //
+        // The broadcasters close after both, whichever branch ran: a Ctrl+C that lands during the drain
+        // runs interrupt() from the shutdown hook, and when that closed them, the batches the consumer
+        // was still checking were reported to closed broadcasters and reached nobody.
+        try {
+            final boolean producersTerminated;
+            try {
+                producersTerminated =
+                        producerExecutorService.awaitTermination(finder.awaitTerminateSeconds, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                // The wait was cut short, so the producers may still be running: the order of the
+                // timed-out branch, and the exception afterwards.
+                interrupt();
+                releaseConsumer();
+                throw e;
+            }
+            if (producersTerminated) {
+                releaseConsumer();
+                interrupt();
+            } else {
+                interrupt();
+                releaseConsumer();
+            }
+        } finally {
+            closeBroadcasters();
+        }
+    }
 
-        // no producers are running anymore, the consumer can be interrupted
+    /**
+     * Tears down a run whose start failed part-way: stops whatever already started, the consumer
+     * last.
+     *
+     * <p>{@link #interrupt()} alone leaves the consumer running, because on the completion path
+     * {@link #shutdownAndAwaitTermination()} releases it. A start that fails after
+     * {@link #startConsumer()} never reaches that path, and the consumer's non-daemon threads then
+     * keep the JVM alive after the error has been reported. For the same reason the consumer is
+     * released even if stopping the rest fails; that failure then propagates.
+     */
+    public void abortStart() {
+        try {
+            interrupt();
+        } finally {
+            try {
+                releaseConsumer();
+            } finally {
+                closeBroadcasters();
+            }
+        }
+    }
+
+    /**
+     * Tells whether a consumer is running: started by {@link #startConsumer()} and not yet released.
+     *
+     * @return {@code true} while the consumer runs
+     */
+    @VisibleForTesting
+    public boolean isConsumerRunning() {
+        return consumerJava != null;
+    }
+
+    /** Interrupts the consumer, which checks what is still queued before it stops, and forgets it. */
+    private void releaseConsumer() {
         final ConsumerJava localConsumerJava = consumerJava;
         if (localConsumerJava != null) {
             LOGGER.info("Interrupt: " + localConsumerJava);
@@ -711,39 +1053,71 @@ public class Finder implements Interruptable {
      * producer twice is not harmless — an OpenCL producer's second release is rejected by the driver
      * with {@code CL_INVALID_MEM_OBJECT}. {@link ProducerReleaser} owns that guarantee; clearing the
      * collections below is bookkeeping, not the safeguard.
+     *
+     * <p>The whole body runs under one lock, so the second caller waits until the first has finished,
+     * the release of the producers included. That can take up to {@code shutdownTimeoutSeconds} plus
+     * the one-second grace of {@code waitTillProducerNotRunning()} per producer still running; a
+     * {@code Ctrl+C} during the teardown of a finished run therefore waits
+     * for that teardown rather than racing it. The startup steps that register, initialise and start
+     * a producer take the same lock per producer and check {@link #interrupted} under it, which is
+     * set before the lock so that a step already running stops at its next producer instead of
+     * getting ahead of a waiting interrupt.
+     *
+     * <p>The result broadcasters are left open: the consumer may still be checking what the producers
+     * queued, and it reports every batch to them. {@link #shutdownAndAwaitTermination()} and
+     * {@link #abortStart()} close them once the consumer is released. A WebSocket key producer whose
+     * endpoint a broadcaster took over therefore keeps that endpoint running here.
      */
     @Override
     public void interrupt() {
-        LOGGER.info("interrupt called: delegate interrupt to all keyProducers and producers");
+        interrupted = true;
+        synchronized (interruptLock) {
+            LOGGER.info("interrupt called: delegate interrupt to all keyProducers and producers");
 
-        // Key producers first. A producer waiting for its next secret is parked inside the key
-        // producer, and a key producer configured to block indefinitely (timeoutMillis < 0, which is
-        // what an interactively driven source wants) only releases that wait when it is interrupted.
-        // Waiting for the producers first would therefore wait for something that cannot happen
-        // until after the wait — the producer would sit there until its shutdownTimeoutSeconds ran
-        // out, turning every shutdown into a multi-minute stall.
-        for (KeyProducer keyProducer : getKeyProducers().values()) {
-            LOGGER.info("Interrupt KeyProducer: " + keyProducer.toString());
-            keyProducer.interrupt();
+            // Key producers first. A producer waiting for its next secret is parked inside the key
+            // producer, and a key producer configured to block indefinitely (timeoutMillis < 0, which is
+            // what an interactively driven source wants) only releases that wait when it is interrupted.
+            // Waiting for the producers first would therefore wait for something that cannot happen
+            // until after the wait — the producer would sit there until its shutdownTimeoutSeconds ran
+            // out, turning every shutdown into a multi-minute stall.
+            for (KeyProducer keyProducer : getKeyProducers().values()) {
+                LOGGER.info("Interrupt KeyProducer: " + keyProducer.toString());
+                keyProducer.interrupt();
+            }
+            freeAllKeyProducers();
+
+            // Interrupt and release all Producers, each exactly once even under a concurrent teardown.
+            producerReleaser.release(getAllProducers());
+            freeAllProducers();
+
+            LOGGER.info("All producers released and freed.");
         }
-        freeAllKeyProducers();
+    }
 
-        // Broadcasters own sockets of their own; releasing them here keeps the process able to exit.
-        for (ZmqResultBroadcaster broadcaster : zmqBroadcasters) {
-            broadcaster.close();
+    /**
+     * Closes the result broadcasters; called once the consumer is released, so no batch can be
+     * reported any more. Idempotent: the lists it walks are cleared.
+     *
+     * <p>Broadcasters own sockets (and a WebSocket broadcaster the key producer's endpoint); releasing
+     * them keeps the process able to exit.
+     */
+    private void closeBroadcasters() {
+        synchronized (interruptLock) {
+            beforeResultBroadcastersClosed.run();
+            for (WebSocketResultBroadcaster broadcaster : webSocketBroadcasters) {
+                broadcaster.close();
+            }
+            webSocketBroadcasters.clear();
+            for (ZmqResultBroadcaster broadcaster : zmqBroadcasters) {
+                broadcaster.close();
+            }
+            zmqBroadcasters.clear();
+            for (SocketResultBroadcaster broadcaster : socketBroadcasters) {
+                broadcaster.close();
+            }
+            socketBroadcasters.clear();
+            resultBroadcasters.clear();
         }
-        zmqBroadcasters.clear();
-        for (SocketResultBroadcaster broadcaster : socketBroadcasters) {
-            broadcaster.close();
-        }
-        socketBroadcasters.clear();
-        resultBroadcasters.clear();
-
-        // Interrupt and release all Producers, each exactly once even under a concurrent teardown.
-        producerReleaser.release(getAllProducers());
-        freeAllProducers();
-
-        LOGGER.info("All producers released and freed.");
     }
 
     /**

@@ -16,10 +16,20 @@ import static org.hamcrest.Matchers.isIn;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
+import static org.hamcrest.Matchers.sameInstance;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableList;
 import java.io.File;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import net.ladenthin.bitcoinaddressfinder.LMDBBase;
 import net.ladenthin.bitcoinaddressfinder.LMDBPlatformAssume;
 import net.ladenthin.bitcoinaddressfinder.OpenCLPlatformAssume;
@@ -34,6 +44,15 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.configuration.CTuneConfiguration;
 import net.ladenthin.bitcoinaddressfinder.configuration.GpuFilterType;
+import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerIdUnknownException;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDevice;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDeviceSelection;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatformSelector;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClPlatformId;
+import net.ladenthin.bitcoinaddressfinder.producer.Producer;
+import net.ladenthin.bitcoinaddressfinder.producer.ProducerReleaser;
+import net.ladenthin.bitcoinaddressfinder.producer.ProducerState;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
 import nl.altindag.log.LogCaptor;
@@ -71,6 +90,116 @@ public class TuneConfigurationTest extends LMDBBase {
     public TuneConfigurationTest() {}
 
     // <editor-fold desc="grid sweep mechanism">
+
+    /**
+     * A key producer id that names nothing fails the run in {@code Finder.startKeyProducer}, after
+     * the consumer threads have started. Left running, those non-daemon threads keep the JVM alive
+     * after the error is reported — measured end to end over the CLI.
+     */
+    @Test
+    public void run_unknownKeyProducerId_leavesNoNonDaemonThreadBehind() throws Exception {
+        // arrange
+        CTuneConfiguration cTuneConfiguration = cpuTuneConfiguration();
+        cTuneConfiguration.finder.producerJava.get(0).keyProducerId = "typo";
+        Set<Thread> before = liveNonDaemonThreads();
+
+        // act
+        assertThrows(KeyProducerIdUnknownException.class, () -> new TuneConfiguration(cTuneConfiguration).run());
+
+        // assert
+        long deadline = System.currentTimeMillis() + LEFT_OVER_THREAD_WAIT_MILLIS;
+        Set<Thread> leftOver = leftOver(before);
+        while (!leftOver.isEmpty() && System.currentTimeMillis() < deadline) {
+            Thread.sleep(LEFT_OVER_THREAD_POLL_MILLIS);
+            leftOver = leftOver(before);
+        }
+        assertThat(leftOver, is(empty()));
+    }
+
+    private static final long LEFT_OVER_THREAD_WAIT_MILLIS = 10_000L;
+    private static final long LEFT_OVER_THREAD_POLL_MILLIS = 50L;
+
+    private static Set<Thread> liveNonDaemonThreads() {
+        Set<Thread> threads = new HashSet<>();
+        for (Thread thread : Thread.getAllStackTraces().keySet()) {
+            if (thread.isAlive() && !thread.isDaemon()) {
+                threads.add(thread);
+            }
+        }
+        return threads;
+    }
+
+    private static Set<Thread> leftOver(Set<Thread> before) {
+        Set<Thread> now = liveNonDaemonThreads();
+        now.removeAll(before);
+        return now;
+    }
+
+    @Test
+    public void run_noBatchSizeCandidate_isRejectedNamingTheField() {
+        // arrange
+        CTuneConfiguration cTuneConfiguration = cpuTuneConfiguration();
+        cTuneConfiguration.batchSizeInBitsCandidates = List.of();
+
+        // act
+        IllegalArgumentException exception =
+                assertThrows(IllegalArgumentException.class, () -> new TuneConfiguration(cTuneConfiguration).run());
+
+        // assert
+        assertThat(
+                exception.getMessage(),
+                is(equalTo("tuneConfiguration.batchSizeInBitsCandidates must name at least one candidate")));
+    }
+
+    @Test
+    public void run_noKeysPerWorkItemCandidate_isRejectedNamingTheField() {
+        // arrange
+        CTuneConfiguration cTuneConfiguration = cpuTuneConfiguration();
+        cTuneConfiguration.keysPerWorkItemCandidates = List.of();
+
+        // act
+        IllegalArgumentException exception =
+                assertThrows(IllegalArgumentException.class, () -> new TuneConfiguration(cTuneConfiguration).run());
+
+        // assert
+        assertThat(
+                exception.getMessage(),
+                is(equalTo("tuneConfiguration.keysPerWorkItemCandidates must name at least one candidate")));
+    }
+
+    @Test
+    public void run_nullKeysPerWorkItemCandidates_isRejectedNamingTheField() {
+        // arrange — a JSON "null" for the whole list binds to a null field
+        CTuneConfiguration cTuneConfiguration = cpuTuneConfiguration();
+        cTuneConfiguration.keysPerWorkItemCandidates = null;
+
+        // act
+        IllegalArgumentException exception =
+                assertThrows(IllegalArgumentException.class, () -> new TuneConfiguration(cTuneConfiguration).run());
+
+        // assert
+        assertThat(
+                exception.getMessage(),
+                is(equalTo(
+                        "tuneConfiguration.keysPerWorkItemCandidates must name at least one candidate but was null")));
+    }
+
+    @Test
+    public void run_nullBatchSizeCandidate_isRejectedNamingTheField() {
+        // arrange — a JSON "null" in the list binds to a null element
+        CTuneConfiguration cTuneConfiguration = cpuTuneConfiguration();
+        cTuneConfiguration.batchSizeInBitsCandidates = new ArrayList<>(BATCH_SIZE_CANDIDATES);
+        cTuneConfiguration.batchSizeInBitsCandidates.add(null);
+
+        // act
+        IllegalArgumentException exception =
+                assertThrows(IllegalArgumentException.class, () -> new TuneConfiguration(cTuneConfiguration).run());
+
+        // assert
+        assertThat(
+                exception.getMessage(),
+                is(equalTo("tuneConfiguration.batchSizeInBitsCandidates must not contain null but was [4, 5, null]")));
+    }
 
     @Test
     public void run_cpuProducerWithoutDatabase_producesOneArmPerCandidatePair() {
@@ -124,6 +253,52 @@ public class TuneConfigurationTest extends LMDBBase {
         assertThat(parsed.finder, is(notNullValue()));
         assertThat(parsed.finder.producerJava, hasSize(1));
         assertThat(parsed.finder.producerJava.get(0).batchSizeInBits, is(equalTo(winner.batchSizeInBits())));
+    }
+
+    /**
+     * Every arm writes its grid into the producer before it runs. A device on which no arm succeeds
+     * has no values of its own to report, so its entry in the emitted configuration keeps what the
+     * operator configured — not the grid of its last arm, which is the one that failed. The other
+     * device wins, which is what makes a configuration be emitted at all.
+     */
+    @OpenCLTest
+    @Test
+    public void run_noArmSucceedsOnOneDevice_emittedConfigurationKeepsThatDevicesConfiguredValues() throws Exception {
+        // arrange
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        int gridBits = Math.min(4, new OpenCLPlatformAssume().maxGridBitsForAvailableDevice());
+        CTuneConfiguration cTuneConfiguration = cpuTuneConfiguration();
+        cTuneConfiguration.finder.producerJava.clear();
+        CProducerOpenCL working = new CProducerOpenCL();
+        working.keyProducerId = "tuneKeyProducer";
+        working.enableGpuFilter = false;
+        cTuneConfiguration.finder.producerOpenCL.add(working);
+        CProducerOpenCL failing = new CProducerOpenCL();
+        failing.keyProducerId = "tuneKeyProducer";
+        failing.enableGpuFilter = false;
+        // No platform has a hundredth device, so every arm of this one fails.
+        failing.deviceIndex = 99;
+        failing.batchSizeInBits = 3;
+        failing.keysPerWorkItem = 2;
+        cTuneConfiguration.finder.producerOpenCL.add(failing);
+        cTuneConfiguration.batchSizeInBitsCandidates = List.of(gridBits);
+        cTuneConfiguration.keysPerWorkItemCandidates = List.of(1);
+        cTuneConfiguration.extendSweepWhenWinnerIsAtTheEdge = false;
+
+        try (LogCaptor logCaptor = LogCaptor.forClass(TuneConfiguration.class)) {
+            // act
+            TuneConfiguration tuneConfiguration = new TuneConfiguration(cTuneConfiguration);
+            tuneConfiguration.run();
+            CConfiguration parsed = Main.fromJson(tuneConfiguration.getRecommendedConfigurationJson());
+
+            // assert
+            assertThat(tuneConfiguration.getWinner(), is(notNullValue()));
+            CProducerOpenCL emitted = parsed.finder.producerOpenCL.get(1);
+            assertThat(emitted.deviceIndex, is(equalTo(99)));
+            assertThat(emitted.batchSizeInBits, is(equalTo(3)));
+            assertThat(emitted.keysPerWorkItem, is(equalTo(2)));
+            assertThat(logCaptor.getWarnLogs(), hasItem(containsString("No arm succeeded")));
+        }
     }
 
     /**
@@ -312,20 +487,28 @@ public class TuneConfigurationTest extends LMDBBase {
         CProducerOpenCL producer = new CProducerOpenCL();
 
         TuneConfiguration.applyWinnerTo(
-                producer, new TuneConfiguration.ArmResult(23, 2048, 36_481_091.96d, 1.0d, 20.0d, null));
+                producer,
+                new TuneConfiguration.ArmResult(23, 2048, 36_481_091.96d, 1.0d, 20.0d, null),
+                TuneConfiguration.ConfiguredGrid.of(producer));
 
         assertThat(producer.batchSizeInBits, is(equalTo(23)));
         assertThat(producer.keysPerWorkItem, is(equalTo(2048)));
     }
 
     @Test
-    public void applyWinnerTo_deviceWithoutAUsableArm_leavesTheProducerUntouched() {
+    public void applyWinnerTo_deviceWithoutAUsableArm_restoresTheConfiguredGrid() {
         CProducerOpenCL producer = new CProducerOpenCL();
-        int originalBatchSizeInBits = producer.batchSizeInBits;
+        producer.batchSizeInBits = 3;
+        producer.keysPerWorkItem = 2;
+        TuneConfiguration.ConfiguredGrid configured = TuneConfiguration.ConfiguredGrid.of(producer);
+        // What the sweep's last, failed arm left behind.
+        producer.batchSizeInBits = 20;
+        producer.keysPerWorkItem = 256;
 
-        TuneConfiguration.applyWinnerTo(producer, null);
+        TuneConfiguration.applyWinnerTo(producer, null, configured);
 
-        assertThat(producer.batchSizeInBits, is(equalTo(originalBatchSizeInBits)));
+        assertThat(producer.batchSizeInBits, is(equalTo(3)));
+        assertThat(producer.keysPerWorkItem, is(equalTo(2)));
     }
 
     // </editor-fold>
@@ -555,6 +738,32 @@ public class TuneConfigurationTest extends LMDBBase {
     }
 
     /**
+     * A detected device's index is its position among <em>all</em> devices of its platform, because
+     * detection enumerates them all. A template that kept the prototype's device-type mask would be
+     * resolved among the matching devices only, and on a platform listing a CPU before the GPU (pocl
+     * next to a GPU driver) the index would address a device that is not there.
+     */
+    @Test
+    public void templatesForDevices_prototypeWithGpuMask_templateSelectsTheDetectedDevice() {
+        OpenCLDevice cpu = mock(OpenCLDevice.class);
+        when(cpu.deviceType()).thenReturn(CL10.CL_DEVICE_TYPE_CPU);
+        OpenCLDevice gpu = mock(OpenCLDevice.class);
+        when(gpu.deviceType()).thenReturn(CL10.CL_DEVICE_TYPE_GPU);
+        OpenCLPlatform platform = new OpenCLPlatform(new ClPlatformId(1L), "Platform0", ImmutableList.of(cpu, gpu));
+        CProducerOpenCL prototype = new CProducerOpenCL();
+        prototype.deviceType = CL10.CL_DEVICE_TYPE_GPU;
+        List<TuneConfiguration.DetectedDevice> devices =
+                List.of(new TuneConfiguration.DetectedDevice(0, 1, "GPU", CL10.CL_DEVICE_TYPE_GPU));
+
+        CProducerOpenCL template =
+                TuneConfiguration.templatesForDevices(devices, prototype).get(0);
+        OpenCLDeviceSelection selection = new OpenCLPlatformSelector()
+                .select(List.of(platform), template.platformIndex, template.deviceType, template.deviceIndex);
+
+        assertThat(selection.device(), is(sameInstance(gpu)));
+    }
+
+    /**
      * Everything the sweep does not vary has to survive the copy, or the measured configuration
      * would not be the configuration the operator then runs — the property the whole command rests
      * on.
@@ -607,6 +816,112 @@ public class TuneConfigurationTest extends LMDBBase {
     // </editor-fold>
 
     // <editor-fold desc="sweep extension">
+    /**
+     * An arm's producer that is still running after the wait (its {@code shutdownTimeoutSeconds} ran
+     * out) must not be released: releasing it frees the kernel, queue and buffers it may still be using
+     * inside the driver. That was the shape of F156, and {@code runArm} released unconditionally.
+     */
+    @Test
+    public void releaseArmProducer_stillRunningAfterTheWait_isNotReleasedAndReportsIt() {
+        Producer producer = mock(Producer.class);
+        when(producer.getState()).thenReturn(ProducerState.RUNNING);
+
+        boolean released = TuneConfiguration.releaseArmProducer(producer, new ProducerReleaser());
+
+        assertThat(released, is(false));
+        verify(producer).interrupt();
+        verify(producer).waitTillProducerNotRunning();
+        verify(producer, never()).releaseProducer();
+    }
+
+    @Test
+    public void releaseArmProducer_stoppedProducer_isReleased() {
+        Producer producer = mock(Producer.class);
+        when(producer.getState()).thenReturn(ProducerState.NOT_RUNNING);
+
+        boolean released = TuneConfiguration.releaseArmProducer(producer, new ProducerReleaser());
+
+        assertThat(released, is(true));
+        verify(producer).releaseProducer();
+    }
+
+    /**
+     * A winner on the edge of <b>both</b> axes must have both extended, even when the first extra arm
+     * loses.
+     *
+     * <p>The extension used to stop at the first arm that did not beat the winner and log "The
+     * optimum was inside range." With the winner at the largest {@code keysPerWorkItem} and the
+     * largest {@code batchSizeInBits}, a failed {@code keysPerWorkItem} arm left the other axis
+     * unmeasured, and the message was wrong for it.
+     */
+    @Test
+    public void extendSweep_firstAxisArmLoses_stillTriesTheOtherEdge() {
+        // arrange: lists [8, 10] x [1, 4], winner (10, 4)
+        List<TuneConfiguration.ArmResult> results = new ArrayList<>(List.of(
+                new TuneConfiguration.ArmResult(8, 1, 100.0d, 1.0d, 1.0d, null),
+                new TuneConfiguration.ArmResult(8, 4, 200.0d, 1.0d, 1.0d, null),
+                new TuneConfiguration.ArmResult(10, 1, 300.0d, 1.0d, 1.0d, null),
+                new TuneConfiguration.ArmResult(10, 4, 400.0d, 1.0d, 1.0d, null)));
+        List<TuneConfiguration.SweepExtension> measured = new ArrayList<>();
+
+        // act: every extra arm is slower than the winner
+        TuneConfiguration.extendSweep(results, 0, 10, 4, true, 5, () -> true, next -> {
+            measured.add(next);
+            return new TuneConfiguration.ArmResult(
+                    next.batchSizeInBits(), next.keysPerWorkItem(), 50.0d, 1.0d, 1.0d, null);
+        });
+
+        // assert
+        assertThat(measured, hasSize(2));
+        assertThat(measured.get(0).axis(), is(equalTo("keysPerWorkItem")));
+        assertThat(measured.get(0).keysPerWorkItem(), is(equalTo(8)));
+        assertThat(measured.get(1).axis(), is(equalTo("batchSizeInBits")));
+        assertThat(measured.get(1).batchSizeInBits(), is(equalTo(11)));
+        assertThat(measured.get(1).keysPerWorkItem(), is(equalTo(4)));
+        assertThat(results, hasSize(6));
+    }
+
+    @Test
+    public void extendSweep_extraArmWins_continuesFromTheNewWinner() {
+        // arrange: one candidate each, so the winner (10, 4) is on both edges
+        List<TuneConfiguration.ArmResult> results =
+                new ArrayList<>(List.of(new TuneConfiguration.ArmResult(10, 4, 400.0d, 1.0d, 1.0d, null)));
+        List<TuneConfiguration.SweepExtension> measured = new ArrayList<>();
+
+        // act: keysPerWorkItem 8 wins, 16 loses, then the bit axis of the new winner loses too
+        TuneConfiguration.extendSweep(results, 0, 10, 4, true, 5, () -> true, next -> {
+            measured.add(next);
+            double rate = next.keysPerWorkItem() == 8 && next.batchSizeInBits() == 10 ? 500.0d : 50.0d;
+            return new TuneConfiguration.ArmResult(
+                    next.batchSizeInBits(), next.keysPerWorkItem(), rate, 1.0d, 1.0d, null);
+        });
+
+        // assert
+        assertThat(measured.size(), is(equalTo(3)));
+        assertThat(measured.get(0).keysPerWorkItem(), is(equalTo(8)));
+        assertThat(measured.get(1).keysPerWorkItem(), is(equalTo(16)));
+        assertThat(measured.get(2).batchSizeInBits(), is(equalTo(11)));
+        assertThat(measured.get(2).keysPerWorkItem(), is(equalTo(8)));
+    }
+
+    @Test
+    public void extendSweep_maxExtensionArmsReached_stops() {
+        // arrange
+        List<TuneConfiguration.ArmResult> results =
+                new ArrayList<>(List.of(new TuneConfiguration.ArmResult(10, 4, 400.0d, 1.0d, 1.0d, null)));
+        List<TuneConfiguration.SweepExtension> measured = new ArrayList<>();
+
+        // act: every extra arm loses, but only one is allowed
+        TuneConfiguration.extendSweep(results, 0, 10, 4, true, 1, () -> true, next -> {
+            measured.add(next);
+            return new TuneConfiguration.ArmResult(
+                    next.batchSizeInBits(), next.keysPerWorkItem(), 50.0d, 1.0d, 1.0d, null);
+        });
+
+        // assert
+        assertThat(measured, hasSize(1));
+    }
+
     /**
      * A sweep whose winner sits at the largest value it tried has measured a lower bound, not a
      * peak — and telling the user to run the whole thing again is not a fix, because they run it
@@ -690,6 +1005,41 @@ public class TuneConfigurationTest extends LMDBBase {
         TuneConfiguration.ArmResult winner = new TuneConfiguration.ArmResult(4, 16, 1_000.0d, 10.0d, 20.0d, null);
 
         assertThat(TuneConfiguration.nextExtensionArm(winner, 16, 5, true), is(nullValue()));
+    }
+
+    /**
+     * A {@code keysPerWorkItem} that cannot double inside the grid does not end the extension when
+     * the winner also sits on the largest swept {@code batchSizeInBits}: one more bit is still a valid
+     * arm, and the next one that grid makes room for the doubling.
+     */
+    @Test
+    public void nextExtensionArm_keysPerWorkItemFillsTheGridAtTheLargestBatchSize_continuesByOneBit() {
+        TuneConfiguration.ArmResult winner = new TuneConfiguration.ArmResult(8, 256, 1_000.0d, 10.0d, 20.0d, null);
+
+        TuneConfiguration.SweepExtension next = TuneConfiguration.nextExtensionArm(winner, 256, 8, true);
+
+        assertThat(next, is(notNullValue()));
+        assertThat(next.batchSizeInBits(), is(equalTo(9)));
+        assertThat(next.keysPerWorkItem(), is(equalTo(256)));
+    }
+
+    /**
+     * The filter widths are measured on the first device, so they must be measured at that device's
+     * own winning grid. The global winner belongs to whichever device was fastest, and measuring at
+     * it also writes its values into the first device's producer, which the emitted configuration
+     * then carries.
+     */
+    @Test
+    public void filterSweepArm_twoDevices_usesTheFirstDevicesOwnWinner() {
+        TuneConfiguration.ArmResult firstDeviceWinner =
+                new TuneConfiguration.ArmResult(22, 256, 50_000_000.0d, 1.0d, 20.0d, null);
+        TuneConfiguration.ArmResult secondDeviceWinner =
+                new TuneConfiguration.ArmResult(24, 2048, 110_000_000.0d, 1.0d, 20.0d, null);
+        List<TuneConfiguration.DeviceSweep> deviceSweeps = List.of(
+                new TuneConfiguration.DeviceSweep("first", List.of(firstDeviceWinner), firstDeviceWinner),
+                new TuneConfiguration.DeviceSweep("second", List.of(secondDeviceWinner), secondDeviceWinner));
+
+        assertThat(TuneConfiguration.filterSweepArm(deviceSweeps), is(sameInstance(firstDeviceWinner)));
     }
 
     @Test

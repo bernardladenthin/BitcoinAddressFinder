@@ -122,12 +122,75 @@ public class AbstractKeyProducerQueueBufferedTest {
     }
 
     @Test
+    public void createSecrets_invalidLengthAfterSomeSecrets_returnsThePartialBatchAndLogsTheSecret() throws Exception {
+        // arrange — the third secret of a batch of four has the wrong length. The two before it are out of
+        // the queue already; throwing would lose them unchecked and end the producer. The fourth was never
+        // taken, so it stays queued for the next call.
+        CKeyProducerJavaReceiver config = new CKeyProducerJavaReceiver();
+        TestKeyProducer producer = createTestKeyProducer(config);
+        KeyProducerTestUtility utility = new KeyProducerTestUtility();
+        byte[] first = utility.createFilledSecret((byte) 0x11);
+        byte[] second = utility.createFilledSecret((byte) 0x22);
+        byte[] invalid = {(byte) 0xCA, (byte) 0xFE};
+        byte[] fourth = utility.createFilledSecret((byte) 0x44);
+        producer.addSecret(first);
+        producer.addSecret(second);
+        producer.addSecret(invalid);
+        producer.addSecret(fourth);
+
+        try (LogCaptor logCaptor = LogCaptor.forClass(AbstractKeyProducerQueueBuffered.class)) {
+            // act
+            BigInteger[] secrets = producer.createSecrets(4, false);
+            BigInteger[] next = producer.createSecrets(1, true);
+
+            // assert
+            assertThat(secrets, is(equalTo(new BigInteger[] {new BigInteger(1, first), new BigInteger(1, second)})));
+            assertThat(next, is(equalTo(new BigInteger[] {new BigInteger(1, fourth)})));
+            assertThat(
+                    logCaptor.getWarnLogs(),
+                    hasItem("Discarded a secret of invalid length 2 (expected 32 bytes) after 2 of 4;"
+                            + " returning the partial batch. Secret: cafe"));
+        }
+    }
+
+    @Test
     public void createSecrets_throwsException_onTimeout() throws Exception {
         CKeyProducerJavaReceiver config = new CKeyProducerJavaReceiver();
         TestKeyProducer producer = createTestKeyProducer(config);
 
         // Do not add anything to queue
         assertThrows(NoMoreSecretsAvailableException.class, () -> producer.createSecrets(1, true)); // should timeout
+    }
+
+    @Test
+    public void createSecrets_timeoutAfterSomeSecrets_returnsThePartialBatch() throws Exception {
+        // arrange — a batch of three, but only two secrets arrive before the read timeout. The two
+        // are taken from the queue already; throwing would lose them, and nothing would ever check them.
+        CKeyProducerJavaReceiver config = new CKeyProducerJavaReceiver();
+        TestKeyProducer producer = createTestKeyProducer(config);
+        producer.setReadTimeoutMs(TestTimeProvider.DEFAULT_DELAY);
+        KeyProducerTestUtility utility = new KeyProducerTestUtility();
+        byte[] first = utility.createFilledSecret((byte) 0x11);
+        byte[] second = utility.createFilledSecret((byte) 0x22);
+        producer.addSecret(first);
+        producer.addSecret(second);
+
+        // act
+        BigInteger[] secrets = producer.createSecrets(3, false);
+
+        // assert
+        assertThat(secrets, is(equalTo(new BigInteger[] {new BigInteger(1, first), new BigInteger(1, second)})));
+    }
+
+    @Test
+    public void createSecrets_timeoutBeforeAnySecretOfABatch_throwsException() throws Exception {
+        // arrange — the partial batch is only for secrets already taken; an empty wait still ends the producer.
+        CKeyProducerJavaReceiver config = new CKeyProducerJavaReceiver();
+        TestKeyProducer producer = createTestKeyProducer(config);
+        producer.setReadTimeoutMs(TestTimeProvider.DEFAULT_DELAY);
+
+        // act + assert
+        assertThrows(NoMoreSecretsAvailableException.class, () -> producer.createSecrets(3, false));
     }
 
     @Test
@@ -175,13 +238,11 @@ public class AbstractKeyProducerQueueBufferedTest {
             producer.addSecret(secret); // fills queue
             producer.addSecret(secret); // must fail
 
-            // The formatted message uses the {} placeholder with the byte[] reference --
-            // because byte[].toString() prints '[B@<hash>' the formatted log line is
-            // non-deterministic, but the prefix is stable. Match the prefix only.
+            // The dropped secret is named in hex, so it can be sent again -- not as the
+            // byte[] reference ('[B@<hash>'), which says nothing about which secret it was.
             assertThat(
-                    logCaptor.getErrorLogs().stream()
-                            .anyMatch(s -> s.startsWith("Secret queue is full, ignore secret: ")),
-                    is(true));
+                    logCaptor.getErrorLogs(),
+                    hasItem("Secret queue is full, ignore secret: " + "ab".repeat(secret.length)));
         }
     }
 
@@ -234,6 +295,35 @@ public class AbstractKeyProducerQueueBufferedTest {
         // assert
         BigInteger[] result = future.get(TestTimeProvider.DEFAULT_SOCKET_TIMEOUT, TimeUnit.MILLISECONDS);
         assertThat("createSecrets must return after interrupt", result, is((BigInteger[]) null));
+    }
+
+    @Test
+    public void interrupt_unblocksEveryBlockedConsumer_negativeTimeout() throws Exception {
+        // arrange — several producers may share one key producer (the same keyProducerId); with
+        // timeoutMillis -1 each of them blocks in take(), and interrupt() must release all of them,
+        // not just the one that happens to take the single shutdown sentinel.
+        CKeyProducerJavaReceiver config = new CKeyProducerJavaReceiver();
+        TestKeyProducer producer = createTestKeyProducer(config);
+        producer.setReadTimeoutMs(-1);
+        java.util.concurrent.Callable<BigInteger[]> call = () -> {
+            try {
+                return producer.createSecrets(1, true);
+            } catch (NoMoreSecretsAvailableException e) {
+                return null;
+            }
+        };
+
+        // act
+        Future<BigInteger[]> first = executorService.submit(call);
+        Future<BigInteger[]> second = executorService.submit(call);
+        Thread.sleep(TestTimeProvider.DEFAULT_DELAY);
+        assertThat("both callers must be blocked before interrupt()", first.isDone() || second.isDone(), is(false));
+
+        producer.interrupt();
+
+        // assert
+        assertThat(first.get(TestTimeProvider.DEFAULT_SOCKET_TIMEOUT, TimeUnit.MILLISECONDS), is((BigInteger[]) null));
+        assertThat(second.get(TestTimeProvider.DEFAULT_SOCKET_TIMEOUT, TimeUnit.MILLISECONDS), is((BigInteger[]) null));
     }
 
     @Test

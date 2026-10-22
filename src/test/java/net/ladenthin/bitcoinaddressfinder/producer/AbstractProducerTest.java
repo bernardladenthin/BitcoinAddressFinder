@@ -10,6 +10,7 @@ import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.lessThan;
+import static org.hamcrest.Matchers.lessThanOrEqualTo;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.sameInstance;
@@ -20,10 +21,15 @@ import java.math.BigInteger;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import net.ladenthin.bitcoinaddressfinder.AwaitTimeTest;
 import net.ladenthin.bitcoinaddressfinder.CommonDataProvider;
 import net.ladenthin.bitcoinaddressfinder.MockConsumer;
 import net.ladenthin.bitcoinaddressfinder.MockKeyProducer;
@@ -50,6 +56,21 @@ public class AbstractProducerTest {
     private final Network network = new NetworkParameterFactory().getNetwork();
     private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
     private final BitHelper bitHelper = new BitHelper();
+
+    /** Shutdown timeout of the shutdown-deadline test; short, because the test waits it out. */
+    private static final int SHUTDOWN_TIMEOUT_SECONDS = 2;
+
+    /** How long the grid in progress at the interrupt still takes; well inside the shutdown timeout. */
+    private static final Duration GRID_IN_PROGRESS = Duration.ofSeconds(1);
+
+    /** Scheduling slack granted on top of the bound a wait must stay under. */
+    private static final Duration TIMING_MARGIN = Duration.ofMillis(500);
+
+    /** Upper bound for the producer to reach its first grid on the executor. */
+    private static final Duration START_TIMEOUT = Duration.ofSeconds(10);
+
+    /** Time between two interrupts of one producer; long enough for the deadline to visibly not move. */
+    private static final Duration SECOND_INTERRUPT_DELAY = Duration.ofMillis(500);
 
     // <editor-fold defaultstate="collapsed" desc="initProducer">
     @Test
@@ -362,6 +383,72 @@ public class AbstractProducerTest {
     }
 
     /**
+     * A producer that hands batches over asynchronously gets one chance to wait for them, before it
+     * reports itself finished: the finder releases the consumer the moment no producer is running.
+     */
+    @Test
+    public void run_loopEnds_pendingBatchesAwaitedOnceWhileStillRunning() throws Exception {
+        // arrange
+        CProducer cProducer = new CProducer();
+        cProducer.runOnce = true;
+        final List<ProducerState> statesWhileAwaiting = new ArrayList<>();
+        AbstractProducerTestImpl producer =
+                new AbstractProducerTestImpl(
+                        cProducer,
+                        new MockConsumer(),
+                        keyUtility,
+                        new MockKeyProducer(keyUtility, new Random(1)),
+                        bitHelper,
+                        new RuntimeStatistics()) {
+                    @Override
+                    protected void awaitPendingBatches() {
+                        statesWhileAwaiting.add(getState());
+                    }
+                };
+        producer.initProducer();
+
+        // act
+        producer.run();
+
+        // assert
+        assertThat(statesWhileAwaiting, is(equalTo(List.of(ProducerState.RUNNING))));
+        assertThat(producer.getState(), is(equalTo(ProducerState.NOT_RUNNING)));
+    }
+
+    @Test
+    public void run_produceKeysThrows_pendingBatchesStillAwaited() throws Exception {
+        // arrange
+        CProducer cProducer = new CProducer();
+        final List<ProducerState> statesWhileAwaiting = new ArrayList<>();
+        AbstractProducerTestImpl producer =
+                new AbstractProducerTestImpl(
+                        cProducer,
+                        new MockConsumer(),
+                        keyUtility,
+                        new MockKeyProducer(keyUtility, new Random(1)),
+                        bitHelper,
+                        new RuntimeStatistics()) {
+                    @Override
+                    public void produceKeys() {
+                        throw new RuntimeException("Test exception");
+                    }
+
+                    @Override
+                    protected void awaitPendingBatches() {
+                        statesWhileAwaiting.add(getState());
+                    }
+                };
+        producer.initProducer();
+
+        // act
+        producer.run();
+
+        // assert
+        assertThat(statesWhileAwaiting, is(equalTo(List.of(ProducerState.RUNNING))));
+        assertThat(producer.getState(), is(equalTo(ProducerState.NOT_RUNNING)));
+    }
+
+    /**
      * The counterpart: a producer that stopped because it was asked to must not look like one that
      * crashed, or every clean shutdown would be reported as a failure.
      */
@@ -383,6 +470,60 @@ public class AbstractProducerTest {
         // assert
         assertThat(producer.getState(), is(equalTo(ProducerState.NOT_RUNNING)));
         assertThat(producer.getLastFailure(), is(nullValue()));
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="remainingShutdownNanos">
+    /** A run that ends by itself gives its pending batches the whole timeout: there is no interrupt to measure from. */
+    @Test
+    public void remainingShutdownNanos_noInterruptIssued_isTheWholeShutdownTimeout() {
+        // arrange
+        CProducer cProducer = new CProducer();
+        cProducer.shutdownTimeoutSeconds = SHUTDOWN_TIMEOUT_SECONDS;
+        AbstractProducerTestImpl producer = new AbstractProducerTestImpl(
+                cProducer,
+                new MockConsumer(),
+                keyUtility,
+                new MockKeyProducer(keyUtility, new Random(1)),
+                bitHelper,
+                new RuntimeStatistics());
+
+        // act
+        long remaining = producer.remainingShutdownNanos();
+
+        // assert
+        assertThat(
+                remaining,
+                is(equalTo(Duration.ofSeconds(SHUTDOWN_TIMEOUT_SECONDS).toNanos())));
+    }
+
+    /**
+     * The deadline belongs to the first interrupt. The releaser interrupts a producer that may have
+     * interrupted itself already (an exhausted secret source does); a deadline that moved with every call
+     * would give the readers more time than the releaser waits, which is exactly the gap being closed.
+     */
+    @Test
+    public void interrupt_calledTwice_keepsTheDeadlineOfTheFirstCall() throws Exception {
+        // arrange
+        CProducer cProducer = new CProducer();
+        cProducer.shutdownTimeoutSeconds = SHUTDOWN_TIMEOUT_SECONDS;
+        AbstractProducerTestImpl producer = new AbstractProducerTestImpl(
+                cProducer,
+                new MockConsumer(),
+                keyUtility,
+                new MockKeyProducer(keyUtility, new Random(1)),
+                bitHelper,
+                new RuntimeStatistics());
+        producer.interrupt();
+        long remainingAfterFirst = producer.remainingShutdownNanos();
+        Thread.sleep(SECOND_INTERRUPT_DELAY);
+
+        // act
+        producer.interrupt();
+        long remainingAfterSecond = producer.remainingShutdownNanos();
+
+        // assert: time kept running against the first deadline; a re-recorded one would be nearly whole again
+        assertThat(remainingAfterSecond, is(lessThanOrEqualTo(remainingAfterFirst - SECOND_INTERRUPT_DELAY.toNanos())));
     }
     // </editor-fold>
 
@@ -437,6 +578,11 @@ public class AbstractProducerTest {
         flipper.join();
     }
 
+    /**
+     * Without an interrupt there is no deadline to run to: the wait is the whole
+     * {@code shutdownTimeoutSeconds} plus {@link AbstractProducer#SHUTDOWN_WAIT_GRACE}, from now, and the
+     * error names the real wait and that no interrupt was issued.
+     */
     @Test
     public void waitTillProducerNotRunning_stateStaysRunning_returnsAfterTimeoutAndLogsError() throws IOException {
         CProducer cProducer = new CProducer();
@@ -453,10 +599,68 @@ public class AbstractProducerTest {
             producer.waitTillProducerNotRunning();
             Duration elapsed = Duration.between(start, Instant.now());
 
-            assertThat(elapsed.toSeconds(), is(equalTo(1L)));
+            assertThat(
+                    elapsed.toSeconds(),
+                    is(equalTo(Duration.ofSeconds(1)
+                            .plus(AbstractProducer.SHUTDOWN_WAIT_GRACE)
+                            .toSeconds())));
             assertThat(producer.state, is(equalTo(ProducerState.RUNNING)));
             assertThat(
-                    logCaptor.getErrorLogs(), hasItem(containsString("waitTillProducerNotRunning timed out after 1s")));
+                    logCaptor.getErrorLogs(),
+                    hasItem(containsString("waitTillProducerNotRunning timed out after 2.0s (no interrupt was issued,"
+                            + " shutdownTimeoutSeconds 1 plus 1s grace)")));
+        }
+    }
+
+    /**
+     * The releaser's wait and the producer's own wait for its pending batches used to run the same
+     * {@code shutdownTimeoutSeconds}, but from two different moments: the releaser's from the interrupt,
+     * the producer's from the end of the grid that was in progress at the interrupt. With a consumer that
+     * never takes the batch, the releaser's wait expired first, saw the producer {@code RUNNING}, logged
+     * that its resources are not released and skipped the release -- while the producer stopped one grid
+     * later. An embedded finder leaked the OpenCL context that way, and {@code Finder.interrupt} held its
+     * lock the whole time. The interrupt now records the deadline once, the producer waits for its readers
+     * only until that deadline, and the releaser's wait outlasts it by {@link AbstractProducer#SHUTDOWN_WAIT_GRACE}.
+     */
+    @AwaitTimeTest
+    @Test
+    public void waitTillProducerNotRunning_readersStuckPastTheInterrupt_seesTheProducerStop() throws Exception {
+        // arrange
+        CProducer cProducer = new CProducer();
+        cProducer.shutdownTimeoutSeconds = SHUTDOWN_TIMEOUT_SECONDS;
+        StuckReadersProducerTestImpl producer = new StuckReadersProducerTestImpl(
+                cProducer,
+                new MockConsumer(),
+                keyUtility,
+                new MockKeyProducer(keyUtility, new Random(1)),
+                bitHelper,
+                new RuntimeStatistics());
+        producer.initProducer();
+        ScheduledExecutorService executor = Executors.newScheduledThreadPool(2);
+        try {
+            executor.execute(producer);
+
+            // pre-assert: the interrupt arrives while the first grid is in progress
+            assertThat(producer.awaitGridStarted(START_TIMEOUT), is(true));
+
+            // act -- what ProducerReleaser.release does; the grid ends a moment after the interrupt
+            Instant start = Instant.now();
+            producer.interrupt();
+            ScheduledFuture<?> gridEnd =
+                    executor.schedule(producer::finishGrid, GRID_IN_PROGRESS.toMillis(), TimeUnit.MILLISECONDS);
+            producer.waitTillProducerNotRunning();
+            Duration waited = Duration.between(start, Instant.now());
+
+            // assert: the grid ended, then the producer gave up on its readers and the releaser saw it stop
+            assertThat(gridEnd.isDone(), is(true));
+            assertThat(producer.getState(), is(equalTo(ProducerState.NOT_RUNNING)));
+            Duration bound = Duration.ofSeconds(SHUTDOWN_TIMEOUT_SECONDS)
+                    .plus(AbstractProducer.SHUTDOWN_WAIT_GRACE)
+                    .plus(TIMING_MARGIN);
+            assertThat(waited, is(lessThan(bound)));
+        } finally {
+            producer.finishGrid();
+            executor.shutdownNow();
         }
     }
     // </editor-fold>

@@ -285,9 +285,13 @@ public class GpuFuse8FilterBenchmark {
                     payload.segmentCountLength());
         }
 
-        // A 256-bit base far from the synthetic filter contents: scanned candidates will not
+        // A random base far from the synthetic filter contents: scanned candidates will not
         // collide with the filter, so the compact arm emits only Binary Fuse 8 false-positives.
-        privateKeyBase = new BigInteger(256, new SecureRandom());
+        // 255 bits keep the whole grid below the group order n, and the low batchSizeInBits bits
+        // are cleared because the kernel ORs the work-item offset into the base.
+        privateKeyBase = new BigInteger(255, new SecureRandom())
+                .shiftRight(batchSizeInBits)
+                .shiftLeft(batchSizeInBits);
     }
 
     /**

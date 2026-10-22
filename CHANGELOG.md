@@ -12,6 +12,98 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   2.22.4, LogCaptor 2.12.7 -> 2.13.0 (test; still requests log4j 2.26.1, so the log4j floor guard is
   unchanged), pitest-maven 1.30.0 -> 1.30.1, central-publishing-maven-plugin 0.11.0 -> 0.12.0;
   `anthropics/claude-code-action` v1.0.255 and Gradle 9.8.2 in the shared `verify-signing-key-gradle` job.
+- **Behaviour changes from the bug hunt of 2026-10-16 … 20** (details and tests per id in
+  `BUGHUNT-FOUND.md`). Visible to a user or a configuration:
+  - **Statistics:** "Average contains time" is measured and printed in **ns** (it was `ms` and read 0
+    nearly always) (F11).
+  - **BIP39:** mnemonic and passphrase are **NFKD-normalised** as the BIP39 specification requires, so a
+    non-English mnemonic that was not in NFKD now derives *different* (the correct) keys (F120);
+    `privateKeyMaxNumBits` other than 256 is rejected for BIP39 instead of truncating the keys (F51).
+  - **Socket key producer:** refuses at start a negative `timeoutMillis` (F100), `port == resultPort`
+    in server mode (F155) and in client mode against this machine, where it read its own result
+    server's lines as secrets (F277, review of PR #395), and a port that is already bound (F157),
+    instead of ending as a regular run without a checked key; its final connection failure is logged (F101); `connectRetryCount` counts
+    consecutive failures, not failures over the whole run (F22).
+  - **Result broadcast:** the grid is announced per key producer, and the **smallest** `batchSizeInBits`
+    wins when they differ (F153); a client connecting during the announcement gets it (F119). The socket
+    broadcaster has a per-client queue of 4096 messages, drops a client that falls behind and drains for
+    up to 2 s on close (F20, F130); the ZeroMQ broadcaster lingers 2 s on close (F163).
+  - **Incremental key producer with explicit keys:** the last batch before `endPrivateKey` is shorter
+    instead of being skipped (F160).
+  - **Address import (`AddressFilesToLMDB`):** an amount column that is not a non-negative whole number
+    of satoshi keeps the address with the default amount and is reported once, without
+    `useStaticAmount` (F162, F193); the `HexHash` export is importable again (F150); uppercase CashAddr
+    and Riecoin scripts are read correctly (F121, F122); a leading space or UTF-8 BOM no longer loses a
+    line (F23, F42, F43); a signed Base36 hash is no longer read as two's complement (F58).
+  - **`CompactLMDB`** refuses a non-empty target directory and a target that is the source under another
+    spelling (F31, F132), and honours an interrupt before it starts (F32).
+  - **OpenCL on Linux:** a warning is logged when the kernel is built without the JDK's signal chaining
+    (`libjsig`), and the launchers of an OpenCL run (`run_*OpenCL*.sh`, `run_TuneConfiguration.sh`)
+    preload it (F148; README "OpenCL on Linux").
+  - **Configuration errors fail early:** an unknown `keyProducerId` is reported before the database is
+    loaded (F126); a JSON configuration with a UTF-8 BOM loads (F44).
+  - **Shutdown:** `Finder.interrupt()` serialises its callers, so a Ctrl-C during the teardown of a
+    finished run waits for it (up to `shutdownTimeoutSeconds` per producer) instead of racing it (F34).
+  - **Result broadcast after a Ctrl-C:** the broadcasters are closed only after the consumer has
+    checked the batches still queued, so a client gets the report for every batch drained during the
+    shutdown; a report that arrives after a broadcaster was closed is logged once as a warning instead of
+    being dropped without a word.
+  - **Shutdown after a Ctrl-C, from the review of PR #395 (2026-10-22):** the JVM shutdown hook waits
+    for the run as long as the configured drain can take -- `awaitQueueEmptySeconds` plus the close
+    bounds of the configured result broadcasters (2 s per socket or ZeroMQ broadcaster) plus a 30 s
+    margin, 90 s with the defaults -- instead of a flat 30 s, so the batches the consumer still checks
+    after a Ctrl-C are checked and reported with the default configuration (F273; the tuner command
+    keeps the 30 s margin alone, it broadcasts nothing); a thread interrupt of the wait for the
+    producers runs the teardown (consumer, broadcasters) before it propagates (F274); no producer is
+    registered, initialised or started after the hook's interrupt, which now waits for a producer
+    initialisation in progress (an OpenCL context) before it releases anything (F275); an OpenCL
+    producer's wait for its result readers ends at the `shutdownTimeoutSeconds` deadline measured from
+    the interrupt, and the release waits one second longer, so a stuck consumer no longer leaves the
+    producer reported as "still running" with its OpenCL context unreleased (F276; the two shutdown
+    error lines now say how long was waited since the interrupt).
+  - **Ports that cannot be bound fail the start:** the WebSocket key producer's `port` (it started
+    "successfully" and, with `timeoutMillis: -1`, waited forever) and the socket key producer's
+    `resultPort` (it went on without serving results).
+  - **OpenCL on Linux, `libjsig`:** the warning is decided from what is mapped into the process
+    (`/proc/self/maps`) instead of the `LD_PRELOAD` string, so a preload entry the dynamic linker ignored
+    is warned about and a `libjsig` loaded another way is not; it is logged once per JVM, no longer once
+    per kernel build (the tuner logged it once per arm); `run_TuneConfiguration.sh` preloads it too.
+    The warning names the launchers to copy (`run_OpenCLInfo.sh`, `run_Find_1OpenCLDevice.sh`,
+    `run_TuneConfiguration.sh`) instead of the pattern `run_*OpenCL*.sh`, which missed the tuner's, and
+    a test holds every launcher of an OpenCL run, and only those, to the preload.
+  - **pocl's CPU device:** every kernel the finder launches -- the key kernel, the table precompute
+    kernels and the benchmark hooks the JMH benchmarks call -- runs there with a local work size of at
+    most 256 and at most the kernel's own limit (logged at start-up); left to pocl the key kernel
+    overflowed the worker thread's stack and the JVM died with exit code 139 or 134 at default settings.
+    Other devices keep the driver's choice. The OpenCL launchers still export
+    `POCL_MAX_WORK_GROUP_SIZE=256` unless it is set; the finder does not need it, and a smaller value set
+    there lowers the limit it reads from pocl.
+  - **Socket, WebSocket and ZeroMQ key producers keep a partial batch on a timeout:** when
+    `timeoutMillis` runs out after at least one secret of a batch was received, those secrets are
+    returned as a shorter batch and checked; they used to be dropped unchecked together with the
+    producer. A timeout before the first secret of a batch still ends the producer. A secret dropped
+    because the queue is full is logged in hex instead of as a list of signed bytes. A received secret
+    that is not 32 bytes long ends a batch the same way: the valid secrets before it are returned and
+    checked, the invalid one is logged as a warning in hex and dropped, and the secrets after it stay
+    queued for the next batch; only as the first secret of a batch does it still end the producer.
+  - **Configuration errors name the field:** `producerOpenCL.maxResultReaderThreads` below 1 is rejected
+    when the producer is created (0 failed with a bare `IllegalArgumentException`, a negative value
+    through the constructor with an injected pool built a semaphore the first grid waited on forever);
+    an empty, `null` or `null`-containing `tuneConfiguration.batchSizeInBitsCandidates` or
+    `keysPerWorkItemCandidates` is rejected before the tuner measures anything (it failed after stage 1
+    with a `NoSuchElementException` or a `NullPointerException`).
+  - **Statistics:** a rate or count that rounds up to a thousand of its unit is shown in the next unit,
+    `1.000 M/s` instead of `1000.0 k/s` (statistics line and tuner report); the same holds for the
+    filter-build progress line, `1.0M/s` instead of `1000k/s`.
+- **The OpenCL kernel refuses an unaligned secret base, and the skipped top grid is a warning.**
+  The kernel derives a work item's key by ORing its offset into the lowest word of the base, which is
+  the base plus the offset only when the low `batchSizeInBits` bits of the base are zero; the host
+  reports a hit as base plus offset. `OpenCLContext.createKeys` now checks that once per grid and
+  throws before anything is dispatched, instead of letting the GPU check other keys than the ones it
+  reports. The producers always aligned their bases, so a scan behaves as before; only direct callers
+  of `createKeys` can notice. The last grid below the group order n, which the GPU skips because it
+  contains n, is logged as one warning naming the base instead of an error with a stack trace (it is
+  still recorded as the producer's last failure).
 - **Build tooling: spotbugs-maven-plugin 4.10.4.1 -> 4.10.5.0**, in step with the sibling repositories, and with it
   **Lombok-generated code carries JSpecify nullness** (`lombok.addNullAnnotations = jspecify` in the
   shared `lombok.config`): under `@NullMarked` a generated `equals(Object)` parameter read as non-null
@@ -29,6 +121,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (3.15.0 final, from 3.14). The shared `check-versions.py` now also compares the Kotlin Gradle plugins
   of a repository with its POMs' Kotlin (nothing to compare here) and reads java-llama.cpp's
   `examples/server/pom.xml`.
+- **The default `endPrivateKey` of the incremental key producer is n − 1**
+  (`…D0364140`, `Secp256k1Constants.MAX_VALID_PRIVATE_KEY_HEX`), the last valid key. It was the group
+  order n itself, documented as an inclusive end although n is not a key since the bound became
+  exclusive; a scan of explicit keys to the default end then checked the replacement key in place of n.
+  Grid mode is unaffected: its last grid contains n either way and is skipped on the GPU.
+- **No `System.gc()` before the GPU filter upload any more** (`OpenCLContext.reclaimHeapBeforeUpload`,
+  `GcTrigger` removed). It was added for `CL_MEM_OBJECT_ALLOCATION_FAILURE` on an RX 7900 XTX while
+  the buffer was created with `CL_MEM_COPY_HOST_PTR`; on the chunked LWJGL upload the same card created
+  and filled the 3.10 GB Full-DB Fuse-16 buffer at 40.9 GiB live heap without a collection, which cost
+  83 ms and changed nothing in the probe throughput (2.253 vs 2.252 ms/op).
+- **CI: `KeyProducerJavaZmqTest` no longer runs into the fork timeout.** It was reported as "There
+  was a timeout in the fork" (Windows) and hung on Linux under load when a connection stalled in the
+  ZMTP handshake, jeromq 0.6.0's poller registration race. Every test now has its own `@Timeout` and a
+  thread dump when it fires (`junit-platform.properties`), the test-side sockets that connect cap the
+  handshake at 1 s, and where the producer connects the bound test sender waits for a completed
+  handshake before it sends. That is a guard, not the fix: the fix of the race itself is submitted to
+  jeromq as [zeromq/jeromq#1022](https://github.com/zeromq/jeromq/pull/1022) (open, in no release yet);
+  `TODO.md` lists what to undo once a release carries it.
 - **CI prints the runner's CPU** at the top of `test`, `test-opencl` and `vmlens`
   (`.github/print-host-info.sh`, a shared file of the four repositories): pocl computes on the CPU, so a
   throughput or a timing in those logs can be read against the hardware the job drew.
@@ -77,6 +187,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Spotless formatter version -- is used in another version than in a sibling's default branch.
 
 ### Fixed
+- **`examples/websocket_scanner.html` sends the block that holds "To".** The page treated "To" as
+  exclusive, which only a script comment said: with an aligned "To" (the default included) the block
+  containing the named key was never sent while "Range complete." was logged anyway, unlike the
+  inclusive `endPrivateKey` of an incremental range. The page now rounds up from "To" + 1, the default
+  "To" is `…0107FFFFFF` so the default range keeps its 2^27 keys, and the label and the notes panel
+  state the convention.
+- **README: the ZeroMQ key producer's `timeoutMillis` defaults to 1000 ms**, as the code has since 1.6.0;
+  the table said `-1` (wait forever), so a configuration that left it out ended after a second without a
+  secret instead of waiting.
+- **Fixes from the bug hunt of 2026-10-16 … 20** (details, reproduction and red/green proof per id in
+  `BUGHUNT-FOUND.md`; the user-visible behaviour changes are listed under "Changed"). Lost or
+  unchecked keys:
+  - the GPU skipped keys 2 … `keysPerWorkItem`−1 of the grid at base 0, the default incremental start
+    (F129); a finite GPU run lost its last batches, because the run ended while result readers were
+    still reading back (F192);
+  - batches still queued at shutdown were never checked (F15), and after the shutdown timeout they were
+    reported as "checked, nothing found" against the closed database (F66); the result broadcasters
+    were closed before the consumer had checked the last batches (F131);
+  - a secrets file without `batchUsePrivateKeyIncrement` checked no secret (F08), and out-of-range keys
+    in it are now treated as a grid treats them (F194); the group order n counted as a valid key and the
+    last OpenCL base is n − 2^`batchSizeInBits` (F45, F151).
+
+  Hangs, crashes and resource leaks: a shared socket/WebSocket/ZeroMQ key producer hung the shutdown
+  (F10); concurrent ZeroMQ broadcasts corrupted the socket (F19); a result client that never reads froze
+  the scan (F20); the WebSocket endpoint left a non-daemon thread (F21); the BIP39 producer kept every
+  derived key (F14); the LMDB map grew only once per write (F27); a failed start, or a failed abort of
+  one, left the consumer running (F139, F195); a producer whose release failed left the others running,
+  and one still running was released (F52, F156); a client accepted during the socket broadcaster's
+  close stayed connected (F196); OpenCL was initialised twice on a concurrent first call (F33);
+  `OpenCLBuilder` queried a fixed three work-item sizes (F04).
+
+  Wrong reports: interrupted exports, imports, deltas and secrets-file runs reported "done" (F46–F50);
+  the tuner extended, measured and reported the wrong arm in several cases (F135, F136, F140, F152,
+  F154, F164, F170).
+- **Fixes from the review of PR #395 (2026-10-22)**, F273 … F277 in `BUGHUNT-FOUND.md`, the behaviour
+  changes under "Changed": the shutdown hook's wait against the queue drain, the teardown on an
+  interrupted producer wait, the producer registered or started after the hook's interrupt, the OpenCL
+  release that gave up a grid too early, the socket client reading its own result server.
 - **CI: the GitHub `snapshot` pre-release holds exactly the current build, and the release assets
   include the pom.** `gh release upload --clobber` replaces same-named assets and never removes any
   other, so the `snapshot` release accumulated: the six 1.8.0-SNAPSHOT jars next to the 1.9.0-SNAPSHOT ones, 6

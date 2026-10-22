@@ -485,25 +485,20 @@ public class LMDBPersistence implements Persistence, AddressIterable {
      * <p>If {@link org.lmdbjava.Env.MapFullException} occurs and
      * {@link CLMDBConfigurationWrite#increaseMapAutomatically} is enabled,
      * the map size is increased by {@link CLMDBConfigurationWrite#increaseSizeInMiB}
-     * and the insert is retried once.
+     * and the insert is retried, as often as needed until it fits (see {@code growMapOrRethrow}).
      *
-     * <p>If the second attempt also fails, the configured increase size is too small.
-     * If automatic growth is disabled, the original exception is rethrown.
+     * <p>If automatic growth is disabled or {@code increaseSizeInMiB} is {@code 0} or less,
+     * the original exception is rethrown without resizing the map.
      */
     private void putNewAmountWithAutoIncrease(ByteBuffer hash160, Coin amount) {
         CLMDBConfigurationWrite localLmdbConfigurationWrite = Objects.requireNonNull(lmdbConfigurationWrite);
 
-        try {
-            putNewAmountUnsafe(hash160, amount);
-        } catch (org.lmdbjava.Env.MapFullException e) {
-            if (localLmdbConfigurationWrite.increaseMapAutomatically) {
-                increaseDatabaseSize(new ByteConversion().mibToBytes(lmdbConfigurationWrite.increaseSizeInMiB));
-                // It is possible that the exception will be thrown again, in this case increaseSizeInMiB should be
-                // changed and it's a configuration issue.
-                // See {@link CLMDBConfigurationWrite#increaseSizeInMiB}.
+        while (true) {
+            try {
                 putNewAmountUnsafe(hash160, amount);
-            } else {
-                throw e;
+                return;
+            } catch (org.lmdbjava.Env.MapFullException e) {
+                growMapOrRethrow(localLmdbConfigurationWrite, e);
             }
         }
     }
@@ -539,16 +534,30 @@ public class LMDBPersistence implements Persistence, AddressIterable {
         }
         CLMDBConfigurationWrite localLmdbConfigurationWrite = Objects.requireNonNull(lmdbConfigurationWrite);
 
-        try {
-            putNewAmountsUnsafe(hash160s, amounts);
-        } catch (org.lmdbjava.Env.MapFullException e) {
-            if (localLmdbConfigurationWrite.increaseMapAutomatically) {
-                increaseDatabaseSize(new ByteConversion().mibToBytes(lmdbConfigurationWrite.increaseSizeInMiB));
+        while (true) {
+            try {
                 putNewAmountsUnsafe(hash160s, amounts);
-            } else {
-                throw e;
+                return;
+            } catch (org.lmdbjava.Env.MapFullException e) {
+                growMapOrRethrow(localLmdbConfigurationWrite, e);
             }
         }
+    }
+
+    /**
+     * Grows the map by one increase step after a full-map failure, or rethrows it when automatic
+     * growth is off. Callers retry until the transaction fits: one transaction can need several
+     * steps (a batch of {@code writeBatchSize} random keys dirties a page each), and growing only once
+     * aborted such an import with the shipped {@code increaseSizeInMiB = 1}.
+     *
+     * @param config the write configuration
+     * @param e the failure to rethrow when the map cannot grow
+     */
+    private void growMapOrRethrow(CLMDBConfigurationWrite config, org.lmdbjava.Env.MapFullException e) {
+        if (!config.increaseMapAutomatically || config.increaseSizeInMiB <= 0) {
+            throw e;
+        }
+        increaseDatabaseSize(new ByteConversion().mibToBytes(config.increaseSizeInMiB));
     }
 
     private void putNewAmountsUnsafe(List<ByteBuffer> hash160s, List<Coin> amounts) {

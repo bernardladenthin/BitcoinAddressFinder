@@ -42,11 +42,17 @@ public class CProducer {
     public boolean runOnce = false;
 
     /**
-     * Maximum time (seconds) the orchestrator will wait inside
-     * {@link net.ladenthin.bitcoinaddressfinder.producer.Producer#waitTillProducerNotRunning()}
-     * for this producer to leave the {@code RUNNING} state during shutdown. After this
-     * elapses {@code Finder.interrupt()} logs an error and continues with the rest of
-     * the shutdown chain so a hung producer cannot block the whole process.
+     * Maximum time (seconds) this producer gets to stop once it is interrupted, measured from the
+     * interrupt. It covers the batch in progress and the producer's own wait for its pending batches
+     * (an OpenCL producer's result readers, which a stuck consumer can hold): at the deadline the
+     * producer gives up on them, logs an error and reports itself stopped. The orchestrator's wait in
+     * {@link net.ladenthin.bitcoinaddressfinder.producer.Producer#waitTillProducerNotRunning()} runs to
+     * the same deadline plus a one-second grace, so a producer that gives up exactly at its bound is seen
+     * as stopped and released; one still running after that is logged, its resources are left to the
+     * process exit, and the shutdown chain continues, so a hung producer cannot block the whole process.
+     * A run that ends by itself, without an interrupt, gives its pending batches this whole time from the
+     * end of its last batch. Zero or less means no wait at all for the batch in progress; the orchestrator
+     * still waits its one-second grace.
      *
      * <p>Default: {@code 300} (5 minutes). Increase for producers known to do long
      * batches at shutdown (large OpenCL grids, slow blocking I/O); decrease for fast

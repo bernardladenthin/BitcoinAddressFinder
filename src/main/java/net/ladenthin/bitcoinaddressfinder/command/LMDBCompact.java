@@ -3,7 +3,12 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.command;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CCompactLMDB;
@@ -52,17 +57,42 @@ public class LMDBCompact implements Runnable, Interruptable {
 
     @Override
     public void run() {
+        if (!shouldRun.get()) {
+            LOGGER.info("Compaction interrupted before it started; nothing written.");
+            return;
+        }
         String sourceDirectory = compactLMDB.lmdbConfigurationReadOnly.lmdbDirectory;
         File targetDirectory = new File(compactLMDB.targetDirectory);
 
-        if (targetDirectory.getAbsolutePath().equals(new File(sourceDirectory).getAbsolutePath())) {
+        // the real path, not the absolute one: "<source>/." or a symlink to the source would otherwise
+        // pass, and the delete below would remove the source database itself
+        final boolean targetIsSource;
+        try {
+            targetIsSource = canonical(targetDirectory).equals(canonical(new File(sourceDirectory)));
+        } catch (IOException e) {
+            throw new UncheckedIOException(
+                    "Cannot resolve the source " + sourceDirectory + " or the target " + targetDirectory, e);
+        }
+        if (targetIsSource) {
             throw new IllegalArgumentException(
                     "targetDirectory must differ from the source lmdbDirectory: " + targetDirectory);
         }
         if (!targetDirectory.mkdirs() && !targetDirectory.isDirectory()) {
             throw new IllegalStateException("Failed to create target directory: " + targetDirectory);
         }
-        // MDB_CP_COMPACT writes data.mdb and fails if it already exists; replace a previous compaction.
+        // MDB_CP_COMPACT needs a directory without files. A previous compaction is a lone data.mdb (the
+        // read-only open that verifies it writes no lock file) and is replaced; anything else — another
+        // database with its lock.mdb, say — is refused before its data file is deleted.
+        String[] targetFiles = targetDirectory.list();
+        if (targetFiles == null) {
+            throw new IllegalStateException("Cannot list target directory: " + targetDirectory);
+        }
+        for (String name : targetFiles) {
+            if (!LMDB_DATA_FILE.equals(name)) {
+                throw new IllegalStateException("targetDirectory must be empty or hold only a previous compaction ("
+                        + LMDB_DATA_FILE + "), but contains " + name + ": " + targetDirectory);
+            }
+        }
         File targetDataFile = new File(targetDirectory, LMDB_DATA_FILE);
         if (targetDataFile.exists() && !targetDataFile.delete()) {
             throw new IllegalStateException("Failed to delete existing compacted database: " + targetDataFile);
@@ -101,6 +131,37 @@ public class LMDBCompact implements Runnable, Interruptable {
                         + " vs compacted " + compactedEntries + " — do NOT use this copy.");
             }
         }
+    }
+
+    /**
+     * The real path of {@code file}: absolute, normalized, every symbolic link resolved, also for a path
+     * that does not exist yet (its deepest existing ancestor is resolved and the rest appended).
+     *
+     * <p>Not {@link File#getCanonicalFile()}: on Windows that resolves no symbolic link (JDK-8003887), so
+     * a link to the source passed the identity check there and was refused one step later, by the
+     * empty-target check at {@code lock.mdb}, with the wrong exception. {@link Path#toRealPath} resolves
+     * links on every platform.
+     *
+     * @param file the path to resolve
+     * @return the resolved path
+     * @throws IOException if the existing part of the path cannot be resolved
+     */
+    @VisibleForTesting
+    static File canonical(File file) throws IOException {
+        Path path = file.toPath().toAbsolutePath().normalize();
+        Path existing = path;
+        Path rest = path.getFileSystem().getPath("");
+        while (!Files.exists(existing)) {
+            Path parent = existing.getParent();
+            Path name = existing.getFileName();
+            if (parent == null || name == null) {
+                // the root itself does not exist: toRealPath below reports it
+                break;
+            }
+            rest = name.resolve(rest);
+            existing = parent;
+        }
+        return existing.toRealPath().resolve(rest).toFile();
     }
 
     private static String mib(long bytes) {

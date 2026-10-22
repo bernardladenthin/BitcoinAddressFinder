@@ -39,16 +39,21 @@ public class KeyProducerJavaIncremental extends KeyProducerJava<CKeyProducerJava
         verifyWorkSize(overallWorkSize, cKeyProducerJava.maxWorkSize);
         final BigInteger endPrivateKey = cKeyProducerJava.getEndPrivateKey();
         if (currentValue.compareTo(endPrivateKey) > 0) {
-            throw new NoMoreSecretsAvailableException(currentValue + " exceeds ");
+            throw new NoMoreSecretsAvailableException(currentValue + " exceeds end private key " + endPrivateKey);
         }
 
-        int length = returnStartSecretOnly ? 1 : overallWorkSize;
+        // endPrivateKey is inclusive: the last batch of explicit keys is the shorter rest up to it, so
+        // no key of the range is left out. A grid (returnStartSecretOnly) is expanded by the producer.
+        final int length;
+        if (returnStartSecretOnly) {
+            length = 1;
+        } else {
+            final BigInteger remaining = endPrivateKey.subtract(currentValue).add(BigInteger.ONE);
+            length = remaining.min(BigInteger.valueOf(overallWorkSize)).intValueExact();
+        }
         BigInteger[] secrets = new BigInteger[length];
         BigInteger counter = currentValue;
         for (int i = 0; i < length; i++) {
-            if (counter.compareTo(endPrivateKey) > 0) {
-                throw new NoMoreSecretsAvailableException(counter + " exceeds end private key " + endPrivateKey);
-            }
             secrets[i] = counter;
             counter = counter.add(BigInteger.ONE);
         }

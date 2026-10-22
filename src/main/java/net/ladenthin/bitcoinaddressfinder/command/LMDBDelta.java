@@ -112,7 +112,12 @@ public class LMDBDelta implements Runnable, Interruptable {
             try (Writer writer = Files.newBufferedWriter(deltaFile, StandardCharsets.UTF_8)) {
                 result = writeDelta(reference, others, writer);
             }
-            LOGGER.info("... delta done: " + result.written() + " address(es) written to " + deltaFile + ".");
+            if (shouldRun.get()) {
+                LOGGER.info("... delta done: " + result.written() + " address(es) written to " + deltaFile + ".");
+            } else {
+                LOGGER.warn("... delta interrupted after " + result.written() + " address(es); " + deltaFile
+                        + " is incomplete.");
+            }
             logSourceSummary(result.perSourceContained(), otherLabels);
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to write delta to " + lmdbDelta.deltaAddressesFile, e);

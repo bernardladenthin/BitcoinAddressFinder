@@ -169,7 +169,11 @@ public class GridSizeSweepBenchmark {
         ctx = new OpenCLContext(p, new BitHelper());
         ctx.init();
 
-        privateKeyBase = new BigInteger(256, new SecureRandom());
+        // 255 bits keep the whole grid below the group order n, and the low batchSizeInBits bits
+        // are cleared because the kernel ORs the work-item offset into the base.
+        privateKeyBase = new BigInteger(255, new SecureRandom())
+                .shiftRight(batchSizeInBits)
+                .shiftLeft(batchSizeInBits);
     }
 
     /**

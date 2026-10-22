@@ -10,6 +10,18 @@ SPDX-License-Identifier: Apache-2.0
     xsi:schemaLocation="https://github.com/spotbugs/filter/3.0.0 https://raw.githubusercontent.com/spotbugs/spotbugs/4.8.6/spotbugs/etc/findbugsfilter.xsd">
 
     <!--
+        BIP39 defines the seed over the NFKD form of the mnemonic and the passphrase, and bitcoinj
+        hashes them as given, so the key producer has to normalize (F120). FindSecBugs'
+        IMPROPER_UNICODE warns about normalizing *after* a security check; here nothing is checked
+        before or after, the normalized string is the input the standard prescribes.
+    -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.BIP39KeyProducer"/>
+        <Method name="&lt;init&gt;"/>
+        <Bug pattern="IMPROPER_UNICODE"/>
+    </Match>
+
+    <!--
         PREDICTABLE_RANDOM and DMI_RANDOM_USED_ONLY_ONCE are by design:
 
         KeyProducerJavaRandom.java:54,57 (PREDICTABLE_RANDOM) — the
@@ -191,8 +203,8 @@ SPDX-License-Identifier: Apache-2.0
 
     <!--
         RFI_SET_ACCESSIBLE flags reflective access into
-        private/protected members. All 5 sites here reach into
-        third-party libraries that expose no public alternative for
+        private/protected members. Both sites here reach into
+        a third-party library that exposes no public alternative for
         what we need:
 
           - Bech32Helper: bitcoinj 0.17's Bech32.convertBits is
@@ -200,44 +212,48 @@ SPDX-License-Identifier: Apache-2.0
             Bech32.Bech32Bytes.witnessProgram / witnessVersion are
             protected; both are needed for SegWit address decoding
             paths that bitcoinj does not expose publicly.
-          - LMDBPersistence.getApproximateSizeBytes: Guava's
-            BloomFilter does not expose its in-memory size. We read
-            the private backing array length for diagnostics.
 
         The :add-opens JVM flags in .mvn/jvm.config and pom.xml
         explicitly permit this access at runtime.
     -->
     <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.util.Bech32Helper"/>
         <Or>
-            <And>
-                <Class name="net.ladenthin.bitcoinaddressfinder.util.Bech32Helper"/>
-                <Or>
-                    <Method name="invokeConvertBitsStatic"/>
-                    <Method name="invokeProtectedMethod"/>
-                </Or>
-            </And>
-            <And>
-                <Class name="net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence"/>
-                <Method name="getApproximateSizeBytes"/>
-            </And>
+            <Method name="invokeConvertBitsStatic"/>
+            <Method name="invokeProtectedMethod"/>
         </Or>
         <Bug pattern="RFI_SET_ACCESSIBLE"/>
     </Match>
 
     <!--
         EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS on
-        LMDBPersistence.getApproximateSizeBytes: the reflective
-        access suppressed in the RFI block above can throw checked
-        exceptions (NoSuchFieldException, IllegalAccessException).
-        They are wrapped in RuntimeException because this is a
-        best-effort diagnostic-size estimate; callers log the
-        result and continue regardless. Adding throws to the static
-        helper would force every caller to handle exceptions for a
-        non-critical metric.
+        KeyProducerJavaSocket.bindServerSocket: the server port is bound
+        in start(), whose contract (core.Startable#start) declares no
+        checked exception for every key producer. A port that cannot be
+        bound must fail the start, so the IOException is rethrown as an
+        IllegalStateException naming the key producer and the port,
+        with the original as its cause.
     -->
     <Match>
-        <Class name="net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence"/>
-        <Method name="getApproximateSizeBytes"/>
+        <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaSocket"/>
+        <Method name="bindServerSocket"/>
+        <Bug pattern="EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS"/>
+    </Match>
+
+    <!--
+        EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS on
+        WebSocketEndpoint.awaitListening: same reason as bindServerSocket
+        above. The endpoint starts inside KeyProducerJavaWebSocket.start(),
+        whose contract (core.Startable#start) declares no checked
+        exception. Java-WebSocket reports a bind failure only through the
+        future that onError completes, so its ExecutionException (and a
+        timeout or an interrupted wait) is rethrown as an
+        IllegalStateException naming the port, with the original as its
+        cause.
+    -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.WebSocketEndpoint"/>
+        <Method name="awaitListening"/>
         <Bug pattern="EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS"/>
     </Match>
 
@@ -272,7 +288,7 @@ SPDX-License-Identifier: Apache-2.0
 
     <!--
         EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS on
-        AddressTxtLine.fromLine: the inner try block uses a
+        AddressTxtLine.fromAddress (the address part of fromLine): the inner try block uses a
         type-filtering catch pattern - DecoderException (Bouncy
         Castle unchecked, signalling invalid Bech32 chars) is
         caught and rethrown unchanged so callers see the original
@@ -286,14 +302,28 @@ SPDX-License-Identifier: Apache-2.0
     -->
     <Match>
         <Class name="net.ladenthin.bitcoinaddressfinder.io.AddressTxtLine"/>
-        <Method name="fromLine"/>
+        <Method name="fromAddress"/>
         <Bug pattern="EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS"/>
+    </Match>
+
+    <!--
+        ACEM_ABSTRACT_CLASS_EMPTY_METHODS on AbstractProducer.awaitPendingBatches:
+        a hook with a deliberate no-op default. Producers that hand their batches to
+        the consumer on their own thread (ProducerJava, the secrets-file producer)
+        have nothing to wait for; only ProducerOpenCL, whose result readers enqueue
+        asynchronously, overrides it (F192). Declaring it abstract would force an
+        empty override into every synchronous producer.
+    -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.producer.AbstractProducer"/>
+        <Method name="awaitPendingBatches"/>
+        <Bug pattern="ACEM_ABSTRACT_CLASS_EMPTY_METHODS"/>
     </Match>
 
     <!--
         EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS on
         AbstractPlaintextFile.readFile: same type-filtering catch
-        idiom as AddressTxtLine.fromLine above. LmdbException
+        idiom as AddressTxtLine.fromAddress above. LmdbException
         (subclass e.g. MapFullException is the trigger for the
         map-auto-grow recovery path elsewhere) must propagate
         unchanged; everything else is logged and the read
@@ -575,6 +605,21 @@ SPDX-License-Identifier: Apache-2.0
     </Match>
 
     <!--
+        IMC_IMMATURE_CLASS_NO_EQUALS on SignalChainingCheck.
+
+        SignalChainingCheck carries a once-per-instance gate (an AtomicBoolean behind
+        warningOnce) and is held by OpenCLContext as one static instance, so the libjsig
+        warning is logged once per JVM. Its Lombok @ToString trips the IMC heuristic into
+        demanding equals()/hashCode(), but value equality would be wrong for a gate: two
+        instances with the same flag are still two gates, and the class is only ever used by
+        identity. equals()/hashCode() are intentionally omitted.
+    -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.opencl.SignalChainingCheck"/>
+        <Bug pattern="IMC_IMMATURE_CLASS_NO_EQUALS"/>
+    </Match>
+
+    <!--
         USBR_UNNECESSARY_STORE_BEFORE_RETURN on Lombok-generated equals / hashCode /
         canEqual / toString.
 
@@ -743,6 +788,15 @@ SPDX-License-Identifier: Apache-2.0
                 <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext"/>
                 <Method name="allocateFilterBuffers"/>
             </And>
+            <And>
+                <!--
+                    ProducerReleaser.release keeps releasing the remaining producers when one teardown
+                    throws (F52), then rethrows that first caught exception unchanged (later ones as
+                    suppressed). Same caught-and-rethrown pattern, deferred until the loop is done.
+                -->
+                <Class name="net.ladenthin.bitcoinaddressfinder.producer.ProducerReleaser"/>
+                <Method name="release"/>
+            </And>
         </Or>
         <Bug pattern="THROWS_METHOD_THROWS_RUNTIMEEXCEPTION"/>
     </Match>
@@ -859,44 +913,41 @@ SPDX-License-Identifier: Apache-2.0
     </Match>
 
     <!--
-        DLS_DEAD_LOCAL_STORE on four deliberate "ignored value" patterns.
-
-        Three are the canonical Error-Prone-compliant "fire-and-forget Future"
-        idiom: when a submit/scheduleAtFixedRate return is intentionally
-        unused, the project assigns it to `Object unused` and applies
-        @FireAndForget("…rationale…") + @SuppressWarnings("FutureReturnValueIgnored")
-        to silence Error Prone's FutureReturnValueIgnored. fb-contrib's DLS
-        reads the same dead store and flags it; honouring DLS by dropping the
-        local would immediately re-trigger FutureReturnValueIgnored, so the
-        two rules are at odds and we accept the DLS finding as the documented
-        tradeoff. Sites: ConsumerJava.startStatisticsTimer (scheduler),
-        Finder.startProducer (producer submit), KeyProducerJavaWebSocket.start
-        (server submit).
-
-        The fourth (LMDBPersistence.count) is the standard "count an Iterable
-        by iterating, discarding each item" pattern:
+        DLS_DEAD_LOCAL_STORE on LMDBPersistence.count, the standard "count an
+        Iterable by iterating, discarding each item" pattern:
             for (KeyVal ignored : iterable) { count++; }
         The loop variable IS the count's side effect; LMDB's CursorIterable
         offers no Stream / size() shortcut so the iteration is mandatory.
     -->
     <Match>
         <Bug pattern="DLS_DEAD_LOCAL_STORE"/>
+        <Class name="net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence"/>
+        <Method name="count"/>
+    </Match>
+
+    <!--
+        RV_RETURN_VALUE_IGNORED_BAD_PRACTICE on the fire-and-forget submits: the Future of a task
+        whose lifecycle is driven out of band (Producer.interrupt() and Finder.interrupt() for the
+        producers, close() for the result broadcaster's accept loop and writers) is deliberately not
+        kept. Each site carries @FireAndForget naming that lifecycle and the method-level
+        @SuppressWarnings("FutureReturnValueIgnored") for Error Prone. The sites used to assign the
+        Future to `Object unused` instead, which fb-contrib read as a dead store (the DLS entries
+        above) and CodeQL as an unread local variable (PR #395); a bare call is what every tool
+        but SpotBugs accepts, and this is SpotBugs' share of the same tradeoff.
+    -->
+    <Match>
+        <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE"/>
         <Or>
-            <And>
-                <Class name="net.ladenthin.bitcoinaddressfinder.consumer.ConsumerJava"/>
-                <Method name="startStatisticsTimer"/>
-            </And>
             <And>
                 <Class name="net.ladenthin.bitcoinaddressfinder.engine.Finder"/>
                 <Method name="startProducer"/>
             </And>
             <And>
-                <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaWebSocket"/>
-                <Method name="start"/>
-            </And>
-            <And>
-                <Class name="net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence"/>
-                <Method name="count"/>
+                <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.SocketResultBroadcaster"/>
+                <Or>
+                    <Method name="start"/>
+                    <Method name="startWriter"/>
+                </Or>
             </And>
         </Or>
     </Match>
@@ -1018,10 +1069,6 @@ SPDX-License-Identifier: Apache-2.0
             <And>
                 <Class name="net.ladenthin.bitcoinaddressfinder.util.KeyUtility"/>
                 <Method name="swapIntBytes"/>
-            </And>
-            <And>
-                <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenClTask"/>
-                <Method name="cloneByteBuffer"/>
             </And>
             <And>
                 <Class name="net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils"/>
@@ -1188,6 +1235,26 @@ SPDX-License-Identifier: Apache-2.0
         <Bug pattern="IMC_IMMATURE_CLASS_NO_EQUALS"/>
     </Match>
 
+    <!-- Style nag: BIP39KeyProducer is a stateful key generator (a java.util.Random facade with a
+         derivation counter), not a value object; equals/hashCode would be meaningless and would also
+         have to touch the private parent key. Identity equality is correct. Surfaced once the field
+         changed from DeterministicKeyChain to DeterministicKey (F14, the key cache fix). -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.BIP39KeyProducer"/>
+        <Bug pattern="IMC_IMMATURE_CLASS_NO_EQUALS"/>
+    </Match>
+
+    <!-- The constructors fail fast on a maxResultReaderThreads below one (F213): the check runs before
+         super(...) and before the result-reader pool exists, so nothing is partially built that holds a
+         resource. SpotBugs still flags the public constructor because the constructor it delegates to
+         throws. The finalizer-attack vector it warns about is obsolete: finalize() is deprecated since
+         Java 9, this class declares none, and it holds no security-sensitive state. -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.producer.ProducerOpenCL"/>
+        <Method name="&lt;init&gt;"/>
+        <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+    </Match>
+
     <!-- The constructor fail-fast validates windowMillis and the class is intentionally non-final (so it
          can be subclassed / mocked in tests). SpotBugs then warns about a finalizer attack on the
          partially-constructed object, but that vector is obsolete: finalize() is deprecated since Java 9,
@@ -1298,14 +1365,6 @@ SPDX-License-Identifier: Apache-2.0
         <Bug pattern="ENMI_NULL_ENUM_VALUE"/>
     </Match>
 
-    <!-- Intentional leak-safe fail-fast: rethrows the caught RuntimeException after freeing the
-         first allocated buffer so no VRAM leaks on a partial allocation failure. -->
-    <Match>
-        <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext"/>
-        <Method name="allocateFilterBuffersFromPointer"/>
-        <Bug pattern="THROWS_METHOD_THROWS_RUNTIMEEXCEPTION"/>
-    </Match>
-
     <!-- Serialising the recommended configuration (a local in-memory POJO) to JSON can only fail on
          a programming error, never on runtime input, so the checked JsonProcessingException is
          deliberately wrapped in an IllegalStateException that carries the full winner context and the
@@ -1371,9 +1430,9 @@ SPDX-License-Identifier: Apache-2.0
         ("deliberate dependency injection") in the main EI_EXPOSE_REP block above, where the
         OpenCL classes are listed.
 
-        DLS_DEAD_LOCAL_STORE - the "Object unused = executor.submit(...)" form used to satisfy
-        Error Prone's FutureReturnValueIgnored for a deliberately fire-and-forget task. Both sites
-        carry @FireAndForget naming the lifecycle that replaces the Future.
+        DLS_DEAD_LOCAL_STORE - WebSocketEndpoint; SocketResultBroadcaster's entry went with the
+        "Object unused = executor.submit(...)" form, whose replacement is the
+        RV_RETURN_VALUE_IGNORED_BAD_PRACTICE entry above.
 
         EXS_EXCEPTION_SOFTENING_* - both sites soften on purpose. OpenClLibraryLoader turns an
         UnsatisfiedLinkError from a failed library-name probe into a domain exception that names
@@ -1402,10 +1461,7 @@ SPDX-License-Identifier: Apache-2.0
     </Match>
 
     <Match>
-        <Or>
-            <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.SocketResultBroadcaster"/>
-            <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.WebSocketEndpoint"/>
-        </Or>
+        <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.WebSocketEndpoint"/>
         <Bug pattern="DLS_DEAD_LOCAL_STORE"/>
     </Match>
 

@@ -58,7 +58,7 @@ public class StatisticsTest {
                         + " exampleRandom (Random, CPU)=900.0 M (23.1%)]"
                         + " [Producers running: 2] [Consumers running: 4]"
                         + " [Consumer ready for work (queue empty): 4567]"
-                        + " [Producer blocked (queue full): 1234] [Average contains time: 3 ms]"
+                        + " [Producer blocked (queue full): 1234] [Average contains time: 3 ns]"
                         + " [keys queue size: 5678] [Hits: 6789]")));
     }
 
@@ -96,7 +96,7 @@ public class StatisticsTest {
                         + " [-> LMDB 200.0 M/s (400 M lookups total)] [rate window 60s]"
                         + " [Keys per producer: none] [Producers running: 0] [Consumers running: 0]"
                         + " [Consumer ready for work (queue empty): 0] [Producer blocked (queue full): 0]"
-                        + " [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]")));
+                        + " [Average contains time: 0 ns] [keys queue size: 0] [Hits: 0]")));
     }
     // </editor-fold>
 
@@ -132,13 +132,42 @@ public class StatisticsTest {
     }
 
     /**
-     * A value within rounding distance of the next unit is rendered in the unit its magnitude
-     * selected rather than being promoted. Pinned because it looks like a bug on first sight and a
-     * future reader should find the decision recorded rather than "fix" it.
+     * A value that rounds up to a thousand of its unit is shown in the next unit: the rounding to
+     * {@code SIGNIFICANT_DIGITS} decides the unit, not the unrounded magnitude. Below the carry the
+     * value keeps its unit.
      */
     @Test
-    public void formatRate_justBelowTheNextUnit_rendersAsAThousandOfTheSmallerUnit() {
-        assertThat(Statistics.formatRate(999_999_999.0), is(equalTo("1000.0 M/s")));
+    public void formatRate_valueRoundingUpToAThousandOfItsUnit_carriesIntoTheNextUnit() {
+        assertThat(Statistics.formatRate(999_999.9), is(equalTo("1.000 M/s")));
+        assertThat(Statistics.formatRate(999_999_999.0), is(equalTo("1.000 G/s")));
+        assertThat(Statistics.formatRate(999_950.0), is(equalTo("1.000 M/s")));
+        assertThat(Statistics.formatRate(999.96), is(equalTo("1.000 k/s")));
+        assertThat(Statistics.formatRate(999.5), is(equalTo("1.000 k/s")));
+    }
+
+    @Test
+    public void formatRate_valueBelowTheCarry_keepsItsUnit() {
+        assertThat(Statistics.formatRate(999.4), is(equalTo("999/s")));
+        assertThat(Statistics.formatRate(999_949.0), is(equalTo("999.9 k/s")));
+        assertThat(Statistics.formatRate(999_949_999.0), is(equalTo("999.9 M/s")));
+    }
+
+    /**
+     * The precision of the rounding follows the value: its integer digits below a thousand, four from a
+     * thousand on. A value with exactly four integer digits is the case that tells the two apart (a
+     * precision one short renders {@code 1234.5} as {@code "1.200 k/s"}); a value that is not a number
+     * renders as zero, an infinite one says so (it passes the rounding unchanged, and a rounding that
+     * replaced it with zero would render {@code Long.MAX_VALUE}), and a negative or fractional one as
+     * its whole number, as before.
+     */
+    @Test
+    public void formatRate_precisionFollowsTheIntegerDigits() {
+        assertThat(Statistics.formatRate(1_234.5), is(equalTo("1.235 k/s")));
+        assertThat(Statistics.formatRate(12.5), is(equalTo("13/s")));
+        assertThat(Statistics.formatRate(0.4), is(equalTo("0/s")));
+        assertThat(Statistics.formatRate(Double.NaN), is(equalTo("0/s")));
+        assertThat(Statistics.formatRate(Double.POSITIVE_INFINITY), is(equalTo("Infinity G/s")));
+        assertThat(Statistics.formatRate(-2_500.4), is(equalTo("-2500/s")));
     }
     // </editor-fold>
 
@@ -203,6 +232,15 @@ public class StatisticsTest {
         assertThat(Statistics.formatCount(1_000_000L), is(equalTo("1.000 M")));
         assertThat(Statistics.formatCount(1_000L), is(equalTo("1.000 k")));
         assertThat(Statistics.formatCount(0L), is(equalTo("0")));
+    }
+
+    @Test
+    public void formatCount_valueRoundingUpToAThousandOfItsUnit_carriesIntoTheNextUnit() {
+        assertThat(Statistics.formatCount(999_999_999L), is(equalTo("1.000 G")));
+        assertThat(Statistics.formatCount(999_950L), is(equalTo("1.000 M")));
+        assertThat(Statistics.formatCount(999_949L), is(equalTo("999.9 k")));
+        assertThat(Statistics.formatCount(1_234L), is(equalTo("1.234 k")));
+        assertThat(Statistics.formatCount(999L), is(equalTo("999")));
     }
     // </editor-fold>
 

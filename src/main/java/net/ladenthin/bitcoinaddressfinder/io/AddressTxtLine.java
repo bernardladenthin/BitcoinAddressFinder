@@ -13,6 +13,9 @@ import static net.ladenthin.bitcoinaddressfinder.constants.AddressConstants.WITN
 import com.google.common.hash.Hashing;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.Locale;
+import java.util.function.Consumer;
+import java.util.regex.Pattern;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import net.ladenthin.bitcoinaddressfinder.model.AddressToCoin;
@@ -27,6 +30,7 @@ import org.bitcoinj.base.SegwitAddress;
 import org.bitcoinj.base.exceptions.AddressFormatException;
 import org.bouncycastle.util.encoders.DecoderException;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,8 +49,18 @@ public class AddressTxtLine {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AddressTxtLine.class);
 
-    /** Creates a new {@link AddressTxtLine}. */
-    public AddressTxtLine() {}
+    /** The Bitcoin Cash prefix as an uppercase CashAddr carries it. */
+    private static final String BITCOIN_CASH_PREFIX_UPPERCASE = "BITCOINCASH:";
+
+    /** A CashAddr in uppercase: version character {@code Q} or {@code P} and 41 characters of the charset. */
+    private static final Pattern UPPERCASE_CASH_ADDR = Pattern.compile("[QP][QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L]{41}");
+
+    /**
+     * A bare hash160 in hex, as the {@code HexHash} export writes it (case-insensitive). No other
+     * accepted format is 40 characters of hex only: Base58 addresses are at most 35 characters, a
+     * CashAddr is 42, the Riecoin script 46, and Bech32 carries characters outside hex.
+     */
+    private static final Pattern HEX_HASH160 = Pattern.compile("[0-9a-fA-F]{40}");
 
     /**
      * Should not be {@link Coin#ZERO} because it can't be written to LMDB.
@@ -93,6 +107,25 @@ public class AddressTxtLine {
 
     Bech32Helper bech32Helper = new Bech32Helper();
 
+    /** Hears of every line whose amount was not usable; see {@link #AddressTxtLine(Consumer)}. */
+    @ToString.Exclude
+    private final Consumer<String> unusableAmountListener;
+
+    /** Creates a new {@link AddressTxtLine} that does not report unusable amounts. */
+    public AddressTxtLine() {
+        this(line -> {});
+    }
+
+    /**
+     * Creates a new {@link AddressTxtLine} that reports every line whose amount column is present but not
+     * a non-negative whole number of satoshi. Such a line keeps its address with {@link #DEFAULT_COIN}.
+     *
+     * @param unusableAmountListener receives the trimmed line
+     */
+    public AddressTxtLine(Consumer<String> unusableAmountListener) {
+        this.unusableAmountListener = unusableAmountListener;
+    }
+
     /**
      * Parses a line containing an address and optional amount.
      * Throws {@link AddressFormatNotAcceptedException} if the address is unsupported,
@@ -113,15 +146,49 @@ public class AddressTxtLine {
         if (line.trim().startsWith(IGNORE_LINE_PREFIX)) {
             throw new AddressFormatNotAcceptedException(REASON_IGNORE_PREFIX, line);
         }
+        // Trimmed before splitting: space and tab are separators, so a leading one would produce an
+        // empty first token and an indented line would be rejected as having no address.
+        line = line.trim();
+        // CashAddr is case-insensitive and QR codes write it in uppercase; the prefix check below and
+        // the decoder only know the lowercase form.
+        if (line.contains(BITCOIN_CASH_PREFIX_UPPERCASE)) {
+            line = line.replace(BITCOIN_CASH_PREFIX_UPPERCASE, BITCOIN_CASH_PREFIX);
+        }
         // Remove the Bitcoin Cash prefix (which includes a colon) to avoid incorrect splitting.
         // This ensures the address is recognized properly and not misinterpreted during parsing.
         if (line.contains(BITCOIN_CASH_PREFIX)) {
             line = line.replace(BITCOIN_CASH_PREFIX, "");
         }
         String[] lineSplitted = SeparatorFormat.split(line);
-        String address = lineSplitted[COLUMN_ADDRESS];
-        Coin amount = getCoinIfPossible(lineSplitted, DEFAULT_COIN);
+        final @Nullable Coin parsedAmount = getCoinIfPossible(lineSplitted, DEFAULT_COIN);
+        final AddressToCoin addressToCoin = fromAddress(
+                lineSplitted[COLUMN_ADDRESS], parsedAmount != null ? parsedAmount : DEFAULT_COIN, line, keyUtility);
+        // Reported only once the address is accepted: a rejected line (a header, an unsupported
+        // format) stores nothing, so it is no address with an unusable amount.
+        if (parsedAmount == null) {
+            unusableAmountListener.accept(line);
+        }
+        return addressToCoin;
+    }
+
+    /**
+     * Parses the address column of one line.
+     *
+     * @param address    the address column, untrimmed
+     * @param amount     the amount the line carries, or the default
+     * @param line       the whole line, for rejection reasons
+     * @param keyUtility utility for byte buffer conversions
+     * @return the parsed address with {@code amount}
+     * @throws AddressFormatNotAcceptedException if the address is not accepted
+     */
+    private @NonNull AddressToCoin fromAddress(String address, Coin amount, String line, KeyUtility keyUtility)
+            throws AddressFormatNotAcceptedException {
         address = address.trim();
+        // An all-uppercase CashAddr would otherwise reach the Base58 fallback and decode to a wrong
+        // hash160. No Base58 address is 42 characters long, so the pattern cannot claim one.
+        if (UPPERCASE_CASH_ADDR.matcher(address).matches()) {
+            address = address.toLowerCase(Locale.ROOT);
+        }
         if (address.isEmpty()) {
             throw new AddressFormatNotAcceptedException(REASON_EMPTY, line);
         }
@@ -137,12 +204,21 @@ public class AddressTxtLine {
             final int length20Bytes = OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES;
             final String riecoinP2SHPrefix = OP_DUP + OP_HASH160 + OP_PUSH_20_BYTES;
             final int riecoinScriptPubKeyLengthHex = length20Bytes * 2 + riecoinP2SHPrefix.length();
-            if (address.length() >= riecoinScriptPubKeyLengthHex && address.startsWith(riecoinP2SHPrefix)) {
+            // hex is case-insensitive; an uppercase script would otherwise reach the Base58 fallback
+            if (address.length() >= riecoinScriptPubKeyLengthHex
+                    && address.regionMatches(true, 0, riecoinP2SHPrefix, 0, riecoinP2SHPrefix.length())) {
                 final String hash160Hex =
                         address.substring(riecoinP2SHPrefix.length(), length20Bytes * 2 + riecoinP2SHPrefix.length());
                 final ByteBuffer hash160 = keyUtility.byteBufferUtility().getByteBufferFromHex(hash160Hex);
                 return new AddressToCoin(hash160, amount, AddressType.P2PKH_OR_P2SH);
             }
+        }
+
+        // Bare hash160 in hex: the HexHash export format (LMDBToAddressFile). The origin of the hash
+        // (P2PKH, P2SH, P2WPKH) is not part of it.
+        if (HEX_HASH160.matcher(address).matches()) {
+            final ByteBuffer hash160 = keyUtility.byteBufferUtility().getByteBufferFromHex(address);
+            return new AddressToCoin(hash160, amount, AddressType.P2PKH_OR_P2SH);
         }
 
         // Blockchair Multisig (P2MS) format is not supported
@@ -307,16 +383,29 @@ public class AddressTxtLine {
         return new AddressToCoin(hash160AsByteBuffer, DEFAULT_COIN, addressType);
     }
 
-    private @NonNull Coin getCoinIfPossible(@NonNull String[] lineSplitted, @NonNull Coin defaultValue) {
-        if (lineSplitted.length > COLUMN_AMOUNT) {
-            String amountString = lineSplitted[COLUMN_AMOUNT];
-            try {
-                return Coin.valueOf(Long.parseLong(amountString));
-            } catch (NumberFormatException e) {
-                return defaultValue;
-            }
-        } else {
+    /**
+     * Reads the amount column. An amount that is present but not a non-negative whole number of satoshi
+     * (a decimal BTC value, text, a value above {@code Long.MAX_VALUE}, an empty column, a negative value)
+     * is unusable; the address itself stays valid, since the amount is only side information for the
+     * search, and {@link #fromLine} reports the line once the address is accepted.
+     *
+     * @param lineSplitted the columns of the line
+     * @param defaultValue the amount of a line without an amount column
+     * @return the amount, {@code defaultValue} without an amount column, or {@code null} if unusable
+     */
+    private @Nullable Coin getCoinIfPossible(@NonNull String[] lineSplitted, @NonNull Coin defaultValue) {
+        if (lineSplitted.length <= COLUMN_AMOUNT) {
             return defaultValue;
         }
+        String amountString = lineSplitted[COLUMN_AMOUNT];
+        try {
+            long satoshi = Long.parseLong(amountString);
+            if (satoshi >= 0) {
+                return Coin.valueOf(satoshi);
+            }
+        } catch (NumberFormatException e) {
+            // unusable, see the return below
+        }
+        return null;
     }
 }

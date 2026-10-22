@@ -10,6 +10,7 @@ import static org.hamcrest.Matchers.is;
 import java.math.BigInteger;
 import net.ladenthin.bitcoinaddressfinder.constants.Radix;
 import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
+import net.ladenthin.bitcoinaddressfinder.util.PrivateKeyValidator;
 import org.junit.jupiter.api.Test;
 
 public class CKeyProducerJavaIncrementalTest {
@@ -71,8 +72,13 @@ public class CKeyProducerJavaIncrementalTest {
     // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="getEndPrivateKey">
+    /**
+     * The end is inclusive, so the default must be the last valid key, n - 1. It was n itself, which
+     * has not been a valid key since the group order became the exclusive bound (F45): a scan of
+     * explicit keys to the default end then checked the replacement key in place of n.
+     */
     @Test
-    public void getEndPrivateKey_defaultEndAddress_returnsMaxPrivateKey() {
+    public void getEndPrivateKey_defaultEndAddress_returnsTheLastValidPrivateKey() {
         // arrange
         CKeyProducerJavaIncremental sut = new CKeyProducerJavaIncremental();
 
@@ -80,7 +86,9 @@ public class CKeyProducerJavaIncrementalTest {
         BigInteger result = sut.getEndPrivateKey();
 
         // assert
-        assertThat(result, is(equalTo(Secp256k1Constants.MAX_PRIVATE_KEY)));
+        assertThat(result, is(equalTo(Secp256k1Constants.MAX_PRIVATE_KEY.subtract(BigInteger.ONE))));
+        assertThat(new PrivateKeyValidator().isOutsidePrivateKeyRange(result), is(false));
+        assertThat(new PrivateKeyValidator().isOutsidePrivateKeyRange(result.add(BigInteger.ONE)), is(true));
     }
 
     @Test

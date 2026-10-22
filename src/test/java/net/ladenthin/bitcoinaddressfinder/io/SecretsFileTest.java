@@ -107,6 +107,32 @@ public class SecretsFileTest {
     }
 
     @Test
+    public void readFile_stringDoSha256FormatWithUtf8ByteOrderMark_firstLineIsHashedWithoutTheMark() throws Exception {
+        // arrange: Windows editors write UTF-8 files with a leading byte order mark (EF BB BF)
+        Path path = folder.resolve("secrets.txt");
+        byte[] bom = {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
+        byte[] body = "test\n".getBytes(StandardCharsets.UTF_8);
+        byte[] content = new byte[bom.length + body.length];
+        System.arraycopy(bom, 0, content, 0, bom.length);
+        System.arraycopy(body, 0, content, bom.length, body.length);
+        Files.write(path, content);
+        ReadStatistic readStatistic = new ReadStatistic();
+        List<BigInteger[]> captured = new ArrayList<>();
+        SecretsFile secretsFile =
+                new SecretsFile(network, path.toFile(), CSecretFormat.STRING_SHA256, readStatistic, captured::add);
+        // SHA256("test") = 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
+        BigInteger expectedSecret =
+                new BigInteger("9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", 16);
+
+        // act
+        secretsFile.readFile();
+
+        // assert
+        assertThat(captured.size(), is(equalTo(1)));
+        assertThat(captured.get(0)[0], is(equalTo(expectedSecret)));
+    }
+
+    @Test
     public void processLine_dumpedPrivateKeyFormat_consumerReceivesNonNullPositiveSecret() throws Exception {
         // arrange
         File file = Files.createFile(folder.resolve("secrets.txt")).toFile();

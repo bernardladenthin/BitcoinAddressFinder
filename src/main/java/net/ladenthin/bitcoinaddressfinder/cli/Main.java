@@ -23,6 +23,7 @@ import net.ladenthin.bitcoinaddressfinder.command.LMDBDelta;
 import net.ladenthin.bitcoinaddressfinder.command.LMDBToAddressFile;
 import net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFilesToLMDB;
+import net.ladenthin.bitcoinaddressfinder.configuration.CCommand;
 import net.ladenthin.bitcoinaddressfinder.configuration.CCompactLMDB;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConfiguration;
 import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
@@ -77,6 +78,17 @@ public class Main implements Runnable, Interruptable {
     /** SLF4J logger for the CLI entry point. */
     private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
 
+    /** The UTF-8 byte order mark as a decoded character; Windows editors write it at the start of a file. */
+    private static final char BYTE_ORDER_MARK = '\uFEFF';
+
+    /**
+     * What the shutdown hook waits for the run to end besides the finder's own shutdown budget
+     * ({@link Finder#shutdownBudgetSeconds(CFinder)}): the rest of the main thread's work after a
+     * {@code Ctrl+C}, such as closing the database and logging the end of the run, and the whole wait
+     * for every other command. It used to be the whole wait for {@code Find} too.
+     */
+    private static final long SHUTDOWN_HOOK_MARGIN_SECONDS = 30L;
+
     // List of registered Interruptables — mutable list of stateful coordinators, recursive/heavy.
     @ToString.Exclude
     private final List<Interruptable> interruptables = new ArrayList<>();
@@ -110,14 +122,19 @@ public class Main implements Runnable, Interruptable {
     }
 
     /**
-     * Reads the entire contents of {@code path} as a string using UTF-8.
+     * Reads the entire contents of {@code path} as a string using UTF-8, without a leading byte
+     * order mark. Windows editors write one, and Jackson's JSON parser rejects it.
      *
      * @param path the file to read
      * @return the file contents
      * @throws IOException if the file cannot be read
      */
     public static String readString(Path path) throws IOException {
-        return Files.readString(path, StandardCharsets.UTF_8);
+        String content = Files.readString(path, StandardCharsets.UTF_8);
+        if (!content.isEmpty() && content.charAt(0) == BYTE_ORDER_MARK) {
+            return content.substring(1);
+        }
+        return content;
     }
 
     /**
@@ -260,6 +277,39 @@ public class Main implements Runnable, Interruptable {
                                 + "\n" + "########## END   transformed YAML configuration ##########\n");
     }
 
+    /**
+     * Starts a finder in order: key producer, consumer, producers. If a step fails, whatever already
+     * started is torn down before the failure propagates, since the consumer's threads would otherwise
+     * keep the JVM alive. A failure of that teardown is attached to the start failure as suppressed,
+     * so the error that stopped the start is still the one reported.
+     *
+     * @param finder the finder to start
+     * @throws Exception the failure of the step that failed
+     */
+    @VisibleForTesting
+    static void startFinder(Finder finder) throws Exception {
+        try {
+            // key producer first
+            finder.startKeyProducer();
+
+            // consumer second
+            finder.startConsumer();
+
+            // producer last
+            finder.configureProducer();
+            finder.initProducer();
+            finder.startProducer();
+        } catch (Exception e) {
+            // the consumer threads may already run; left alone they keep the JVM alive
+            try {
+                finder.abortStart();
+            } catch (RuntimeException abortFailure) {
+                e.addSuppressed(abortFailure);
+            }
+            throw e;
+        }
+    }
+
     @Override
     public void run() {
         LOGGER.info(configuration.command.name());
@@ -272,16 +322,7 @@ public class Main implements Runnable, Interruptable {
                     CFinder cFinder = Objects.requireNonNull(configuration.finder);
                     Finder finder = new Finder(cFinder);
                     interruptables.add(finder);
-                    // key producer first
-                    finder.startKeyProducer();
-
-                    // consumer second
-                    finder.startConsumer();
-
-                    // producer last
-                    finder.configureProducer();
-                    finder.initProducer();
-                    finder.startProducer();
+                    startFinder(finder);
                     finder.shutdownAndAwaitTermination();
                 }
                 case LMDBToAddressFile -> {
@@ -388,20 +429,60 @@ public class Main implements Runnable, Interruptable {
         }
     }
 
+    /**
+     * How long the shutdown hook waits for {@link #run()} to end before the JVM halts.
+     *
+     * <p>The margin alone used to be the whole wait, and a {@code Find} run exceeded it by design: after
+     * the hook's {@link #interrupt()} the main thread lets the consumer check the queued batches for up
+     * to {@code awaitQueueEmptySeconds} (60 s by default) and then closes the result broadcasters, which
+     * drain for a few seconds more. The JVM halted in the middle of that, the remaining batches stayed
+     * unchecked and the reports queued for the clients never left. So a {@code Find} configuration adds
+     * the finder's budget to the margin; every other command has nothing to drain.
+     *
+     * @param configuration the loaded configuration
+     * @return the seconds the hook waits
+     */
+    @VisibleForTesting
+    static long shutdownHookTimeoutSeconds(CConfiguration configuration) {
+        final CFinder cFinder = configuration.finder;
+        if (configuration.command == CCommand.Find && cFinder != null) {
+            final long budgetSeconds = Finder.shutdownBudgetSeconds(cFinder);
+            // Saturating: awaitQueueEmptySeconds is a plain long nobody validates, and a value near its
+            // maximum ("never give up") must not wrap into a negative wait, which would halt at once.
+            if (budgetSeconds > Long.MAX_VALUE - SHUTDOWN_HOOK_MARGIN_SECONDS) {
+                return Long.MAX_VALUE;
+            }
+            return SHUTDOWN_HOOK_MARGIN_SECONDS + budgetSeconds;
+        }
+        return SHUTDOWN_HOOK_MARGIN_SECONDS;
+    }
+
+    /**
+     * Registers the JVM shutdown hook: it interrupts every registered component and then waits for
+     * {@link #run()} to end, for {@link #shutdownHookTimeoutSeconds(CConfiguration)} -- the
+     * {@link #SHUTDOWN_HOOK_MARGIN_SECONDS} plus, for a {@code Find} run, the finder's shutdown budget
+     * ({@link Finder#shutdownBudgetSeconds(CFinder)}: the consumer's queue drain and the close bounds
+     * of the result broadcasters). Once the wait is over the JVM halts whatever is still running, so
+     * the wait is computed from the configuration rather than being a flat number.
+     */
     private void addSchutdownHook() {
+        final long timeoutSeconds = shutdownHookTimeoutSeconds(configuration);
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             LOGGER.info("Shutdown received via hook.");
             interrupt();
             try {
-                LOGGER.info("runLatch await");
-                if (!runLatch.await(30, TimeUnit.SECONDS)) {
-                    LOGGER.warn("runLatch did not complete within 30s shutdown timeout; "
-                            + "remaining tasks may not have finished cleanly.");
+                LOGGER.info("runLatch await (timeout: {} seconds)", timeoutSeconds);
+                if (!runLatch.await(timeoutSeconds, TimeUnit.SECONDS)) {
+                    LOGGER.warn(
+                            "runLatch did not complete within the {} s shutdown timeout; "
+                                    + "remaining tasks may not have finished cleanly.",
+                            timeoutSeconds);
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new InterruptedRuntimeException(
-                        "Interrupted while awaiting runLatch during shutdown-hook (30s timeout)", e);
+                        "Interrupted while awaiting runLatch during shutdown-hook (" + timeoutSeconds + " s timeout)",
+                        e);
             }
             LOGGER.info("Finish shutdown hook.");
         }));

@@ -93,7 +93,10 @@ public class ConsumerJava implements Consumer {
     private final KeyUtility keyUtility;
     /** Total number of address lookups performed. */
     protected final AtomicLong checkedKeys = new AtomicLong();
-    /** Cumulative time spent inside the persistence's {@code containsAddress} calls (ms). */
+    /**
+     * Cumulative time spent inside the persistence's {@code containsAddress} calls, in nanoseconds: a
+     * lookup takes micro- to nanoseconds, so a millisecond clock measured almost every one as 0.
+     */
     protected final AtomicLong checkedKeysSumOfTimeToCheckContains = new AtomicLong();
     /**
      * Number of consume cycles in which the consumer found no work and was therefore ready
@@ -226,6 +229,13 @@ public class ConsumerJava implements Consumer {
     // Lifecycle flag — uninformative in aggregate toString.
     @ToString.Exclude
     private final AtomicBoolean shouldRun = new AtomicBoolean(true);
+
+    /**
+     * Set by {@link #interrupt()} before it closes the persistence. A lookup on a closed persistence
+     * answers "absent", so a batch a worker finishes after this point was not really checked.
+     */
+    @ToString.Exclude
+    private final AtomicBoolean persistenceClosed = new AtomicBoolean(false);
 
     /**
      * Returns the current value of the cancellation flag — {@code true} as long as no
@@ -766,6 +776,16 @@ public class ConsumerJava implements Consumer {
             }
         }
 
+        // The producers stop before the consumer does, so what is still queued is the last of the
+        // work -- the end of a finite range, the last lines of a secrets file. interrupt() waits
+        // awaitQueueEmptySeconds for exactly this drain; leaving the loop without it dropped those
+        // batches unchecked.
+        try {
+            consumeKeys(threadLocalReuseableByteBuffer);
+        } catch (Exception e) {
+            LOGGER.error("Error while draining the keys queue at shutdown.", e);
+        }
+
         LOGGER.info("end consumeKeysRunner");
     }
 
@@ -917,6 +937,17 @@ public class ConsumerJava implements Consumer {
             }
         }
 
+        // A worker still busy when interrupt() gave up waiting ran (part of) these lookups against
+        // the closed persistence, which answers "absent": the batch was not checked.
+        if (persistenceClosed.get()) {
+            LOGGER.warn(
+                    "Batch of {} keys (secret base {}) was checked after the persistence was closed at shutdown"
+                            + " and is not reported as checked.",
+                    publicKeyBytesArray.length,
+                    String.valueOf(queuedBatch.secretBase()));
+            return;
+        }
+
         // One event per batch, emitted after the checks so it is exact. Reported even when
         // nothing was found: a client sweeping a range needs 'checked, empty' to be
         // distinguishable from 'never checked'.
@@ -1004,13 +1035,13 @@ public class ConsumerJava implements Consumer {
     }
 
     private boolean containsAddress(ByteBuffer hash160AsByteBuffer) {
-        long timeBefore = System.currentTimeMillis();
+        long timeBefore = System.nanoTime();
         if (LOGGER.isTraceEnabled()) {
             LOGGER.trace("Time before lookup.containsAddress: " + timeBefore);
         }
         AddressPresence localLookup = Objects.requireNonNull(lookup);
         boolean containsAddress = localLookup.containsAddress(hash160AsByteBuffer);
-        long timeAfter = System.currentTimeMillis();
+        long timeAfter = System.nanoTime();
         long timeDelta = timeAfter - timeBefore;
         checkedKeys.incrementAndGet();
         checkedKeysSumOfTimeToCheckContains.addAndGet(timeDelta);
@@ -1079,6 +1110,8 @@ public class ConsumerJava implements Consumer {
         }
         try {
             if (persistence != null) {
+                // Before the close, so a worker that is still running sees it after its lookups.
+                persistenceClosed.set(true);
                 Persistence localPersistence = Objects.requireNonNull(persistence);
                 localPersistence.close();
                 persistence = null;

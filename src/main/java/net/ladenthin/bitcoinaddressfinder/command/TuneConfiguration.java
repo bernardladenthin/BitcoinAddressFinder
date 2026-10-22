@@ -26,6 +26,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BooleanSupplier;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CCommand;
@@ -61,6 +63,8 @@ import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
 import net.ladenthin.bitcoinaddressfinder.producer.Producer;
 import net.ladenthin.bitcoinaddressfinder.producer.ProducerJava;
 import net.ladenthin.bitcoinaddressfinder.producer.ProducerOpenCL;
+import net.ladenthin.bitcoinaddressfinder.producer.ProducerReleaser;
+import net.ladenthin.bitcoinaddressfinder.producer.ProducerState;
 import net.ladenthin.bitcoinaddressfinder.statistics.RuntimeStatistics;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
@@ -179,6 +183,13 @@ public class TuneConfiguration implements Runnable, Interruptable {
     /** Cancellation flag; cleared by {@link #interrupt()}. Uninformative in an aggregate toString. */
     @ToString.Exclude
     private final AtomicBoolean shouldRun = new AtomicBoolean(true);
+
+    /**
+     * Releases the arm producers, so the rule that a producer still running after its wait is never
+     * released lives in one place ({@link ProducerReleaser}, F156) for shutdown and tuning alike.
+     */
+    @ToString.Exclude
+    private final ProducerReleaser armProducerReleaser = new ProducerReleaser();
 
     /**
      * Counted down by {@link #interrupt()}. Every wait in this command is an
@@ -359,6 +370,10 @@ public class TuneConfiguration implements Runnable, Interruptable {
 
     @Override
     public void run() {
+        // Before anything is measured or started: an empty list used to surface as a bare
+        // NoSuchElementException from Collections.max after the first stage had already run.
+        requireCandidates("batchSizeInBitsCandidates", cTuneConfiguration.batchSizeInBitsCandidates);
+        requireCandidates("keysPerWorkItemCandidates", cTuneConfiguration.keysPerWorkItemCandidates);
         CFinder cFinder = Objects.requireNonNull(
                 cTuneConfiguration.finder, "tuneConfiguration.finder is required: it is the configuration being tuned");
         CConsumerJava cConsumerJava =
@@ -381,7 +396,6 @@ public class TuneConfiguration implements Runnable, Interruptable {
                 runtimeStatistics);
         // The scan hot path needs *a* lookup, but not a truthful one — see NEVER_PRESENT.
         consumer.initWithLookup(NEVER_PRESENT);
-        consumer.startConsumer();
 
         // Finder is used for exactly one thing: instantiating and registering the configured key
         // producers. Its consumer/producer lifecycle is not reusable here (startConsumer() is bound
@@ -389,10 +403,13 @@ public class TuneConfiguration implements Runnable, Interruptable {
         // producer generation), but the key-producer wiring is, and duplicating that six-strategy
         // dispatch would be the one part of this command guaranteed to drift out of sync.
         Finder finder = new Finder(cFinder);
-        finder.startKeyProducer();
 
         ExecutorService producerExecutor = Executors.newCachedThreadPool();
         try {
+            // Inside the try: the consumer's threads are non-daemon, and startKeyProducer validates
+            // the key producer ids, so a failure there must still reach the teardown below.
+            consumer.startConsumer();
+            finder.startKeyProducer();
             // Built once and reused across every device: the filter is the expensive part (~44 s per
             // 100 M entries), the sweep is the part that has to be repeated per device.
             FilterPayload payload = buildFilterPayload(templates.get(0));
@@ -416,6 +433,7 @@ public class TuneConfiguration implements Runnable, Interruptable {
                     break;
                 }
                 int armsBefore = results.size();
+                ConfiguredGrid configured = ConfiguredGrid.of(template);
                 sweepGrid(
                         template,
                         finder,
@@ -431,7 +449,7 @@ public class TuneConfiguration implements Runnable, Interruptable {
                 // Each device keeps its own optimum. Picking one winner across devices would hand the
                 // slower card the faster card's settings — on a contributor's laptop that would have
                 // been 24/2048 for a device whose own optimum was 23/2048.
-                applyWinnerTo(template, deviceWinner);
+                applyWinnerTo(template, deviceWinner, configured);
             }
             winner = pickWinner(results);
             recommendedFilterType = resolveFilterType(
@@ -509,6 +527,36 @@ public class TuneConfiguration implements Runnable, Interruptable {
             double micros = totalNanos / (samples * 1_000.0d);
             LOGGER.info("Measured verification cost: {} us per lookup (mean of {}).", format(micros), samples);
             return micros;
+        }
+    }
+
+    /**
+     * Rejects a candidate list the sweep cannot use: a missing one (a JSON {@code null} for the whole
+     * list), one without any candidate, which would sweep nothing and then fail in
+     * {@link Collections#max}, or one with a {@code null} element (a JSON {@code null}), which would
+     * fail when the sweep unboxes it. The values themselves are checked per arm: an out-of-range one
+     * fails its arm, which the report shows.
+     *
+     * @param field      the field name in {@link CTuneConfiguration}, for the message
+     * @param candidates the configured candidates; {@code null} when the configuration sets the list
+     *                   to {@code null}
+     * @throws IllegalArgumentException if {@code candidates} is {@code null}, empty or contains
+     *         {@code null}
+     */
+    private static void requireCandidates(String field, @Nullable List<? extends @Nullable Integer> candidates) {
+        if (candidates == null) {
+            throw new IllegalArgumentException(
+                    "tuneConfiguration." + field + " must name at least one candidate but was null");
+        }
+        if (candidates.isEmpty()) {
+            throw new IllegalArgumentException("tuneConfiguration." + field + " must name at least one candidate");
+        }
+        // A loop, not contains(null): an immutable List.of(...) throws on contains(null).
+        for (Integer candidate : candidates) {
+            if (candidate == null) {
+                throw new IllegalArgumentException(
+                        "tuneConfiguration." + field + " must not contain null but was " + candidates);
+            }
         }
     }
 
@@ -597,9 +645,10 @@ public class TuneConfiguration implements Runnable, Interruptable {
      * swept, so a truncated list yields the real optimum instead of a lower bound labelled "Winner".
      *
      * <p>See {@link #nextExtensionArm} for which edges are worth continuing past and which are the
-     * end of the road. The loop stops as soon as an extra arm fails to beat the winner, so the usual
-     * cost is one wasted arm rather than a second sweep; {@code maxExtensionArms} bounds the
-     * pathological case where every step keeps improving.
+     * end of the road. An extra arm that fails to beat the winner ends its own axis, and the loop
+     * goes on with the winner's other edge if it sits on one, so the usual cost is one wasted arm
+     * per edge rather than a second sweep; {@code maxExtensionArms} bounds the pathological case
+     * where every step keeps improving.
      */
     private void extendSweepBeyondTheCandidates(
             CProducer template,
@@ -616,12 +665,56 @@ public class TuneConfiguration implements Runnable, Interruptable {
         if (!cTuneConfiguration.extendSweepWhenWinnerIsAtTheEdge) {
             return;
         }
-        boolean openCl = template instanceof CProducerOpenCL;
+        extendSweep(
+                results,
+                deviceArmsFromIndex,
+                largestSweptBatchSizeInBits,
+                largestSweptKeysPerWorkItem,
+                template instanceof CProducerOpenCL,
+                cTuneConfiguration.maxExtensionArms,
+                shouldRun::get,
+                next -> runArm(
+                        next.batchSizeInBits(),
+                        next.keysPerWorkItem(),
+                        template,
+                        finder,
+                        consumer,
+                        runtimeStatistics,
+                        producerExecutor,
+                        payload,
+                        keyUtility,
+                        bitHelper));
+    }
+
+    /**
+     * The extension loop of {@link #extendSweepBeyondTheCandidates}, with the measurement passed in
+     * so the loop can be driven without a device.
+     *
+     * @param results                     every arm so far; extension arms are appended
+     * @param deviceArmsFromIndex         index of this device's first arm in {@code results}
+     * @param largestSweptBatchSizeInBits the largest {@code batchSizeInBits} of the candidate list
+     * @param largestSweptKeysPerWorkItem the largest {@code keysPerWorkItem} of the candidate list
+     * @param openCl                      whether the swept producer is GPU-backed
+     * @param maxExtensionArms            upper bound on extension arms
+     * @param shouldRun                   {@code false} once the run is being interrupted
+     * @param measure                     runs one arm
+     */
+    @VisibleForTesting
+    static void extendSweep(
+            List<ArmResult> results,
+            int deviceArmsFromIndex,
+            int largestSweptBatchSizeInBits,
+            int largestSweptKeysPerWorkItem,
+            boolean openCl,
+            int maxExtensionArms,
+            BooleanSupplier shouldRun,
+            Function<SweepExtension, ArmResult> measure) {
         int largestBatchSizeInBits = largestSweptBatchSizeInBits;
         int largestKeysPerWorkItem = largestSweptKeysPerWorkItem;
+        boolean lastArmLost = false;
 
-        for (int extension = 1; extension <= cTuneConfiguration.maxExtensionArms; extension++) {
-            if (!shouldRun.get()) {
+        for (int extension = 1; extension <= maxExtensionArms; extension++) {
+            if (!shouldRun.getAsBoolean()) {
                 return;
             }
             // This device's own arms only. Consulting the global list would judge a slow device by
@@ -634,6 +727,10 @@ public class TuneConfiguration implements Runnable, Interruptable {
             SweepExtension next =
                     nextExtensionArmForDevice(deviceArms, largestKeysPerWorkItem, largestBatchSizeInBits, openCl);
             if (next == null) {
+                if (lastArmLost) {
+                    LOGGER.info("Extension stopped: no edge of the winner is left to extend. The optimum was inside"
+                            + " range.");
+                }
                 return;
             }
             LOGGER.info(
@@ -644,34 +741,23 @@ public class TuneConfiguration implements Runnable, Interruptable {
                     next.axis(),
                     "keysPerWorkItem".equals(next.axis()) ? next.keysPerWorkItem() : next.batchSizeInBits(),
                     extension,
-                    cTuneConfiguration.maxExtensionArms);
+                    maxExtensionArms);
 
-            ArmResult result = runArm(
-                    next.batchSizeInBits(),
-                    next.keysPerWorkItem(),
-                    template,
-                    finder,
-                    consumer,
-                    runtimeStatistics,
-                    producerExecutor,
-                    payload,
-                    keyUtility,
-                    bitHelper);
+            ArmResult result = measure.apply(next);
             results.add(result);
             LOGGER.info("Extension arm: {}", describeArm(result));
 
             largestBatchSizeInBits = Math.max(largestBatchSizeInBits, next.batchSizeInBits());
             largestKeysPerWorkItem = Math.max(largestKeysPerWorkItem, next.keysPerWorkItem());
 
-            if (!result.succeeded() || result.candidatesPerSecond() <= currentWinner.candidatesPerSecond()) {
-                LOGGER.info("Extension stopped: the extra arm did not beat the winner. The optimum was inside range.");
-                return;
-            }
+            // A losing arm ends only its own axis: it has now been measured past the winner, so the
+            // next decision moves on to the winner's other edge, if it sits on one.
+            lastArmLost = !result.succeeded() || result.candidatesPerSecond() <= currentWinner.candidatesPerSecond();
         }
         LOGGER.info(
                 "Extension stopped after {} arms (maxExtensionArms). The winner may still be a lower bound;"
                         + " raise maxExtensionArms or widen the candidate lists to look further.",
-                cTuneConfiguration.maxExtensionArms);
+                maxExtensionArms);
     }
 
     /**
@@ -768,12 +854,31 @@ public class TuneConfiguration implements Runnable, Interruptable {
                     0.0d,
                     e.getClass().getSimpleName() + ": " + e.getMessage());
         } finally {
-            if (producer != null) {
-                producer.interrupt();
-                producer.waitTillProducerNotRunning();
-                producer.releaseProducer();
+            if (producer != null && !releaseArmProducer(producer, armProducerReleaser)) {
+                LOGGER.error(
+                        "The producer of arm batchSizeInBits={} keysPerWorkItem={} is still running after the wait;"
+                                + " the sweep stops, since a further arm would share the device with it.",
+                        batchSizeInBits,
+                        keysPerWorkItem);
+                shouldRun.set(false);
             }
         }
+    }
+
+    /**
+     * Stops an arm's producer and releases it, unless it is still running after the wait.
+     *
+     * @param producer the arm's producer
+     * @param releaser the releaser of this run's arm producers
+     * @return whether the producer was released
+     */
+    @VisibleForTesting
+    static boolean releaseArmProducer(Producer producer, ProducerReleaser releaser) {
+        // ProducerReleaser interrupts, waits, and leaves a producer that is still running unreleased:
+        // freeing its kernel, queue and buffers while it may still use them inside the driver is
+        // worse than leaking them (F156). It only logs that; the caller needs to know, to stop.
+        releaser.release(List.of(producer));
+        return producer.getState() != ProducerState.RUNNING;
     }
 
     /**
@@ -870,9 +975,10 @@ public class TuneConfiguration implements Runnable, Interruptable {
             ExecutorService producerExecutor,
             KeyUtility keyUtility,
             BitHelper bitHelper) {
+        ArmResult filterArm = filterSweepArm(deviceSweeps);
         if (cTuneConfiguration.sweepFilterTypes
                 && template instanceof CProducerOpenCL cProducerOpenCL
-                && winner != null
+                && filterArm != null
                 && shouldRun.get()) {
             return measureFilterType(
                     cProducerOpenCL,
@@ -882,9 +988,26 @@ public class TuneConfiguration implements Runnable, Interruptable {
                     producerExecutor,
                     keyUtility,
                     bitHelper,
-                    Objects.requireNonNull(winner));
+                    filterArm);
         }
         return deriveFilterType(effectiveVerificationCostMicros());
+    }
+
+    /**
+     * The grid the filter widths are measured at: the first swept device's own winner, because the
+     * measurement runs on that device's producer.
+     *
+     * <p>Not the global winner: on a multi-device machine that belongs to whichever device was
+     * fastest, and measuring at it would also write its values into the first device's producer, so
+     * the emitted configuration would hand that device another device's grid.
+     *
+     * @param deviceSweeps the per-device breakdown, in sweep order
+     * @return the arm to measure the filter widths with, or {@code null} when the first device has
+     *     no successful arm or nothing was swept
+     */
+    @VisibleForTesting
+    static @Nullable ArmResult filterSweepArm(List<DeviceSweep> deviceSweeps) {
+        return deviceSweeps.isEmpty() ? null : deviceSweeps.get(0).winner();
     }
 
     /**
@@ -1422,6 +1545,9 @@ public class TuneConfiguration implements Runnable, Interruptable {
      * Builds one independent producer template per device, each addressing its own device and
      * carrying every other setting from the prototype.
      *
+     * <p>A template addresses its device with {@code CL_DEVICE_TYPE_ALL}, whatever mask the prototype
+     * carries: a detected device's index is its position among all devices of its platform.
+     *
      * <p>The copy is a JSON round-trip rather than field-by-field assignment. {@code CProducerOpenCL}
      * has upwards of fifteen settings and gains more over time; a hand-written copy silently drops
      * whichever one was added last, and the failure would be a device measured under settings the
@@ -1450,6 +1576,9 @@ public class TuneConfiguration implements Runnable, Interruptable {
                 CProducerOpenCL copy = mapper.readValue(serialisedPrototype, CProducerOpenCL.class);
                 copy.platformIndex = device.platformIndex();
                 copy.deviceIndex = device.deviceIndex();
+                // The detected index counts every device of the platform; a narrower mask inherited
+                // from the prototype would resolve it among the matching devices only.
+                copy.deviceType = CL10.CL_DEVICE_TYPE_ALL;
                 templates.add(copy);
             } catch (JsonProcessingException e) {
                 throw new IllegalStateException(
@@ -1538,7 +1667,7 @@ public class TuneConfiguration implements Runnable, Interruptable {
             if (doubled <= (1L << winner.batchSizeInBits())) {
                 return new SweepExtension(winner.batchSizeInBits(), (int) doubled, "keysPerWorkItem");
             }
-            return null;
+            // the grid is full; a winner on the largest swept batchSizeInBits can still grow that axis
         }
         if (winner.batchSizeInBits() == largestSweptBatchSizeInBits
                 && winner.batchSizeInBits() < OpenClKernelConstants.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY) {
@@ -1613,15 +1742,53 @@ public class TuneConfiguration implements Runnable, Interruptable {
     }
 
     /**
+     * The grid a producer was configured with, taken before its sweep writes each arm's grid into it.
+     *
+     * @param batchSizeInBits the configured {@code batchSizeInBits}
+     * @param keysPerWorkItem the configured {@code keysPerWorkItem}; {@code 0} for a CPU producer,
+     *                        which has none
+     */
+    @VisibleForTesting
+    record ConfiguredGrid(int batchSizeInBits, int keysPerWorkItem) {
+
+        /**
+         * Takes the grid a producer carries now.
+         *
+         * @param template the producer
+         * @return its grid
+         */
+        static ConfiguredGrid of(CProducer template) {
+            int keysPerWorkItem =
+                    template instanceof CProducerOpenCL cProducerOpenCL ? cProducerOpenCL.keysPerWorkItem : 0;
+            return new ConfiguredGrid(template.batchSizeInBits, keysPerWorkItem);
+        }
+    }
+
+    /**
      * Writes a device's own winning values back into its producer, so the emitted configuration
      * describes what was measured on that device rather than on another one.
      *
-     * @param template the producer to update
-     * @param winner   that device's winning arm, or {@code null} if it produced none
+     * <p>A device on which no arm succeeded has no values of its own. Its producer still carries the
+     * grid of its last arm, written by the sweep, so the configured grid is put back and a warning
+     * says why the device's entry was not measured.
+     *
+     * @param template   the producer to update
+     * @param winner     that device's winning arm, or {@code null} if it produced none
+     * @param configured the grid the producer was configured with before its sweep
      */
     @VisibleForTesting
-    static void applyWinnerTo(CProducer template, @Nullable ArmResult winner) {
+    static void applyWinnerTo(CProducer template, @Nullable ArmResult winner, ConfiguredGrid configured) {
         if (winner == null) {
+            template.batchSizeInBits = configured.batchSizeInBits();
+            if (template instanceof CProducerOpenCL cProducerOpenCL) {
+                cProducerOpenCL.keysPerWorkItem = configured.keysPerWorkItem();
+            }
+            LOGGER.warn(
+                    "No arm succeeded on {}; its entry in the recommended configuration keeps the configured"
+                            + " values (batchSizeInBits={}, keysPerWorkItem={}), which were not measured.",
+                    describeTemplateDevice(template),
+                    configured.batchSizeInBits(),
+                    configured.keysPerWorkItem());
             return;
         }
         template.batchSizeInBits = winner.batchSizeInBits();

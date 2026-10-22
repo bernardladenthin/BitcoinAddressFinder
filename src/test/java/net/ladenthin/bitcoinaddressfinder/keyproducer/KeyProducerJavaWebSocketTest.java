@@ -55,6 +55,27 @@ public class KeyProducerJavaWebSocketTest {
     }
 
     @Test
+    public void start_portHeldByAnotherProcess_failsTheStartInsteadOfWaitingForever() throws Exception {
+        // The rule of the socket key producer (F157): a port that cannot be bound is a start failure.
+        // With the recommended timeoutMillis -1 the WebSocket producer otherwise waited forever.
+        try (java.net.ServerSocket occupant = new java.net.ServerSocket(0)) {
+            // arrange
+            CKeyProducerJavaWebSocket config = createConfig();
+            config.port = occupant.getLocalPort();
+            KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper);
+            try {
+                // act
+                IllegalStateException e = assertThrows(IllegalStateException.class, producer::start);
+
+                // assert
+                assertThat(e.getMessage(), containsString(String.valueOf(occupant.getLocalPort())));
+            } finally {
+                producer.interrupt();
+            }
+        }
+    }
+
+    @Test
     public void createSecrets_receivesValidSecret() throws Exception {
         CKeyProducerJavaWebSocket config = createConfig();
         KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper);

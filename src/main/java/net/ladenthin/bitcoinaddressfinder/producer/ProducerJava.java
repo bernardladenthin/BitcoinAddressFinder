@@ -63,6 +63,12 @@ public class ProducerJava extends AbstractProducer {
         try {
             PublicKeyBytes[] publicKeyBytesArray = new PublicKeyBytes[secrets.length];
             for (int i = 0; i < secrets.length; i++) {
+                // As in a grid: a key outside the valid range (0, 1, n or above, from a secrets file
+                // read without validation) is no input fromPrivate can take; key 1 stands in for it.
+                if (privateKeyValidator.isOutsidePrivateKeyRange(secrets[i])) {
+                    publicKeyBytesArray[i] = PublicKeyBytes.INVALID_KEY_ONE;
+                    continue;
+                }
                 publicKeyBytesArray[i] = PublicKeyBytes.fromPrivate(secrets[i]);
             }
             // Independent secrets, so there is no common base to report.

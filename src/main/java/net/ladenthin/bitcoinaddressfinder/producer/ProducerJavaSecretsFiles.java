@@ -5,7 +5,6 @@ package net.ladenthin.bitcoinaddressfinder.producer;
 
 import java.io.File;
 import java.io.IOException;
-import java.math.BigInteger;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJavaSecretsFiles;
@@ -73,28 +72,47 @@ public class ProducerJavaSecretsFiles extends ProducerJava {
                 LOGGER.info("Key production stopped by flag.");
                 break;
             }
-            SecretsFile secretsFile = new SecretsFile(
-                    network, file, producerJavaSecretsFiles.secretFormat, readStatistic, this::consumeSecrets);
+            SecretsFile secretsFile = createSecretsFile(file);
 
             LOGGER.info("Processing secrets file: {}", file);
             currentSecretsFile.set(secretsFile);
+            // interrupt() may have run after the flag check above, while no reader was registered to stop
+            if (!shouldRun.get()) {
+                secretsFile.interrupt();
+            }
             secretsFile.readFile();
             currentSecretsFile.set(null);
+            if (!shouldRun.get()) {
+                LOGGER.warn("Secrets file processing interrupted in: {}", file);
+                logProgress();
+                return;
+            }
             LOGGER.info("Finished processing: {}", file);
 
             logProgress();
         }
-        LOGGER.info("All secrets files processed.");
+        if (shouldRun.get()) {
+            LOGGER.info("All secrets files processed.");
+        } else {
+            LOGGER.warn("Secrets file processing interrupted; not every file was processed.");
+        }
     }
 
-    @Override
-    public void processSecrets(BigInteger[] secrets) {
-        throw new UnsupportedOperationException("Not supported yet.");
+    /**
+     * Creates the reader for one secrets file. A seam for tests, which can act between the flag check at
+     * the top of the file loop and the reader becoming visible to {@link #interrupt()}.
+     *
+     * @param file the secrets file to read
+     * @return the reader for {@code file}
+     */
+    SecretsFile createSecretsFile(File file) {
+        return new SecretsFile(
+                network, file, producerJavaSecretsFiles.secretFormat, readStatistic, this::consumeSecrets);
     }
 
     private void logProgress() {
         LOGGER.info("Progress: Unsupported: " + readStatistic.getUnsupportedTotal() + ". Errors: "
-                + readStatistic.errors.size() + ". Current File progress: "
+                + readStatistic.errorCount + ". Current File progress: "
                 + String.format("%.2f", readStatistic.currentFileProgress) + "%.");
     }
 

@@ -26,7 +26,10 @@ public class CProducerOpenCL extends CProducer {
     /** Index of the OpenCL device within the selected platform. */
     public int deviceIndex = 0;
 
-    /** Maximum number of threads that read OpenCL kernel results concurrently. */
+    /**
+     * Maximum number of threads that read OpenCL kernel results concurrently. Must be at least 1;
+     * the producer rejects a smaller value when it is constructed.
+     */
     public int maxResultReaderThreads = 4;
 
     /**
@@ -62,13 +65,14 @@ public class CProducerOpenCL extends CProducer {
     public int keysPerWorkItem = 1;
 
     /**
-     * Enables the GPU-side Binary Fuse 8 address-presence filter.
+     * Enables the GPU-side Binary Fuse address-presence pre-filter (width: {@link #gpuFilterType}).
      * <p>
-     * When {@code true} and the consumer's address-lookup backend is
-     * {@code BINARY_FUSE_8}, the filter is uploaded to GPU VRAM and the kernel checks each
-     * derived hash160 inline, transmitting only the (tiny) subset of candidates that the
-     * filter marks as possibly present. This collapses the PCIe transfer volume from the
-     * full {@code N}-work-item grid to the handful of hits per batch.
+     * When {@code true} (and {@link #transferAll} is {@code false}), the consumer builds the filter
+     * once from the open LMDB, whatever its {@code addressLookupBackend} is, and it is uploaded to
+     * GPU VRAM; the kernel checks each derived hash160 inline, transmitting only the (tiny) subset
+     * of candidates that the filter marks as possibly present. This collapses the PCIe transfer
+     * volume from the full {@code N}-work-item grid to the handful of hits per batch. The
+     * survivors are then checked by the consumer's own backend.
      * <p>
      * Default {@code false}: the kernel transfers every work-item result (legacy behaviour).
      */

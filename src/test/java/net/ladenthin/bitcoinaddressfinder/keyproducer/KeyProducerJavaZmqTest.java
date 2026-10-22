@@ -8,12 +8,16 @@ import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.math.BigInteger;
+import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaZmq;
 import net.ladenthin.bitcoinaddressfinder.secret.NoMoreSecretsAvailableException;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
@@ -25,11 +29,65 @@ import org.bitcoinj.base.Network;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.zeromq.SocketType;
 import org.zeromq.ZContext;
 import org.zeromq.ZMQ;
 
+/**
+ * Drives {@link KeyProducerJavaZmq} through real ZeroMQ sockets.
+ *
+ * <p>Two guards keep a stalled connection from running into Surefire's whole-fork timeout (240 s),
+ * which reported this class on CI as "There was a timeout in the fork" (Windows, PR #389) and, in the
+ * branch review, hung on Linux under load with {@code main} parked in {@code createSecrets}:
+ *
+ * <ul>
+ *   <li>Every test-side socket that connects goes through {@link #connectSender(ZContext, String)},
+ *       which caps the ZMTP handshake at {@link #HANDSHAKE_IVL_MILLIS}. jeromq 0.6.0's poller can lose
+ *       the registration of a connecting socket's stream engine (about one connection in a hundred, see
+ *       {@link JeromqPollerHandOffRaceTest} and {@code ZmqResultBroadcasterTest}); the engine never
+ *       sends its greeting, and only the handshake timer, 30 s by default, recovers it.
+ *       {@link #connectSender_peerNeverAnswersTheHandshake_reconnectsWithinTheCap()} pins that the cap
+ *       reaches the engine. The fix of the race is submitted as zeromq/jeromq#1022 (open as of
+ *       2026-10-21); {@code TODO.md} says what to change here once a release carries it.</li>
+ *   <li>Every test has a finite {@link Timeout} in its own thread, so a wedge ends as a failure of that
+ *       test, with a thread dump ({@code junit-platform.properties}), instead of taking the fork down.
+ *       The two tests in which the producer connects get {@link #PRODUCER_CONNECTS_TIMEOUT_SECONDS}: the
+ *       producer's socket is production code with jeromq's 30 s handshake timer, which reconnects a
+ *       stalled connection by itself.</li>
+ *   <li>In those two tests the bound test sender sends only after a completed handshake ({@link
+ *       #monitorHandshakes(ZContext, ZMQ.Socket)}): jeromq queues a bound socket's message on a
+ *       connection before its handshake, and a stalled connection takes the message with it when it is
+ *       dropped. Both reproduced hangs were these tests ({@code main} in {@code createSecrets} after both
+ *       sends had returned, the producer never logging the invalid secret).</li>
+ * </ul>
+ */
+@Timeout(value = KeyProducerJavaZmqTest.TEST_TIMEOUT_SECONDS, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
 public class KeyProducerJavaZmqTest {
+
+    /** Budget of a test whose sockets are all capped; each currently takes about two seconds. */
+    static final int TEST_TIMEOUT_SECONDS = 15;
+
+    /** Budget of a test in which the producer connects: above {@link #HANDSHAKE_AWAIT_MILLIS}. */
+    static final int PRODUCER_CONNECTS_TIMEOUT_SECONDS = 50;
+
+    /**
+     * How long {@link #connectSender_peerNeverAnswersTheHandshake_reconnectsWithinTheCap()} waits for
+     * the reconnect: well above {@link #HANDSHAKE_IVL_MILLIS}, well below jeromq's 30 s default.
+     */
+    private static final int RECONNECT_AWAIT_MILLIS = 10_000;
+
+    /** Maximum time a test-side sender allows the ZMTP handshake; jeromq's default is 30 s. */
+    static final int HANDSHAKE_IVL_MILLIS = 1_000;
+
+    /**
+     * How long a bound test sender waits for the producer's handshake: one self-healing stall of the
+     * producer's connecting socket (jeromq's 30 s handshake timer, then a reconnect) plus margin.
+     */
+    private static final int HANDSHAKE_AWAIT_MILLIS = 40_000;
+
+    /** Makes every handshake monitor's {@code inproc} address unique within the JVM. */
+    private static final AtomicInteger MONITOR_SEQUENCE = new AtomicInteger();
 
     private final Network network = new NetworkParameterFactory().getNetwork();
     private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
@@ -65,6 +123,64 @@ public class KeyProducerJavaZmqTest {
         return producer;
     }
 
+    /**
+     * Creates a {@code PUSH} socket connected to {@code address}, the sending side of the tests in
+     * which the producer binds, with the ZMTP handshake capped at {@link #HANDSHAKE_IVL_MILLIS}.
+     *
+     * <p>Only a connecting socket can hit jeromq 0.6.0's poller race (see the class comment); a stalled
+     * sender then drops the connection and reconnects after about a second instead of after the 30 s
+     * default. The option must be set before {@code connect}; later calls do not reach the engine.
+     *
+     * @param context the context that owns the socket (closing it closes the socket)
+     * @param address the producer's address
+     * @return the connected socket
+     */
+    static ZMQ.Socket connectSender(ZContext context, String address) {
+        final ZMQ.Socket sender = context.createSocket(SocketType.PUSH);
+        sender.setHandshakeIvl(HANDSHAKE_IVL_MILLIS);
+        sender.connect(address);
+        return sender;
+    }
+
+    /**
+     * Reports the completed ZMTP handshakes of a bound {@code sender} on a {@code PAIR} socket; call it
+     * before the peer connects, since an event sent before this socket is connected is dropped.
+     *
+     * <p>Needed where the producer connects to a bound test sender. jeromq 0.6.0 creates the bound
+     * side's pipe when the TCP connection is accepted, before the handshake, so a {@code send} returns
+     * at once and the message waits in that connection's pipe. When the producer's connecting socket hits
+     * the poller race, the handshake never completes, both handshake timers end that connection after
+     * 30 s, and the messages in its pipe go with it; the producer's reconnect opens a new, empty pipe.
+     * Sending only after {@link #awaitHandshake(ZMQ.Socket)} puts the message on a connection that
+     * works; a stall then costs up to 30 s instead of the message.
+     *
+     * @param context the context that owns the monitor socket
+     * @param sender the bound socket to monitor
+     * @return the socket the handshake events arrive on, with a receive timeout of {@link
+     *     #HANDSHAKE_AWAIT_MILLIS}
+     */
+    private static ZMQ.Socket monitorHandshakes(ZContext context, ZMQ.Socket sender) {
+        final String monitorAddress = "inproc://handshake-monitor-" + MONITOR_SEQUENCE.incrementAndGet();
+        assertThat(sender.monitor(monitorAddress, ZMQ.EVENT_HANDSHAKE_PROTOCOL), is(true));
+        final ZMQ.Socket handshakes = context.createSocket(SocketType.PAIR);
+        handshakes.setReceiveTimeOut(HANDSHAKE_AWAIT_MILLIS);
+        handshakes.connect(monitorAddress);
+        return handshakes;
+    }
+
+    /**
+     * Waits for a completed ZMTP handshake reported by {@link #monitorHandshakes(ZContext, ZMQ.Socket)}.
+     *
+     * @param handshakes the monitor socket
+     */
+    private static void awaitHandshake(ZMQ.Socket handshakes) {
+        final ZMQ.Event handshake = ZMQ.Event.recv(handshakes);
+        assertThat(
+                "no completed ZMTP handshake with the producer within " + HANDSHAKE_AWAIT_MILLIS + " ms",
+                handshake,
+                is(notNullValue()));
+    }
+
     public static String findFreeZmqAddress() {
         return "tcp://127.0.0.1:" + KeyProducerJavaSocketTest.findFreePort();
     }
@@ -74,11 +190,9 @@ public class KeyProducerJavaZmqTest {
         config.address = address;
         config.mode = CKeyProducerJavaZmq.Mode.BIND;
         // Block until a message arrives (or signalShutdown via interrupt() wakes us).
-        // There is no JUnit per-test timeout in this project; the only hard upper
-        // bound is the Surefire whole-fork timeout (forkedProcessTimeoutInSeconds in
-        // pom.xml), which must cover JVM startup + ALL methods of this class +
-        // shutdown. The @AfterEach teardown interrupts every producer, so a wedged
-        // receive cannot outlive its own test.
+        // The class-level @Timeout bounds each test (see the class comment), and the
+        // @AfterEach teardown interrupts every producer, so a wedged receive cannot
+        // outlive its own test.
         config.timeoutMillis = -1;
         return config;
     }
@@ -93,6 +207,7 @@ public class KeyProducerJavaZmqTest {
 
     // <editor-fold defaultstate="collapsed" desc="createSecrets">
     @Test
+    @Timeout(value = PRODUCER_CONNECTS_TIMEOUT_SECONDS, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
     public void createSecrets_connectMode_receivesSecret() throws Exception {
         // arrange
         try (ZContext context = new ZContext()) {
@@ -101,10 +216,12 @@ public class KeyProducerJavaZmqTest {
             // Server socket (push) binds
             ZMQ.Socket sender = context.createSocket(SocketType.PUSH);
             sender.bind(address);
+            ZMQ.Socket handshakes = monitorHandshakes(context, sender);
 
             // Client config connects to that address
             CKeyProducerJavaZmq config = createConnectConfig(address);
             KeyProducerJavaZmq keyProducer = createKeyProducerJavaZmq(config);
+            awaitHandshake(handshakes);
 
             // Create dummy key
             byte[] secretBytes = new KeyProducerTestUtility().createZeroedSecret();
@@ -144,8 +261,7 @@ public class KeyProducerJavaZmqTest {
         // duration of createSecrets() avoids the jeromq default LINGER=0 which would otherwise drop
         // any message still buffered in the PUSH socket's outbound queue when the context is closed.
         try (ZContext context = new ZContext();
-                ZMQ.Socket socket = context.createSocket(SocketType.PUSH)) {
-            socket.connect(address);
+                ZMQ.Socket socket = connectSender(context, address)) {
             boolean sent = socket.send(secretBytes);
             assertThat("ZMQ send returned false", sent, is(true));
 
@@ -196,8 +312,7 @@ public class KeyProducerJavaZmqTest {
 
         // Now publish a message; the consumer should wake and return it.
         try (ZContext context = new ZContext();
-                ZMQ.Socket socket = context.createSocket(SocketType.PUSH)) {
-            socket.connect(address);
+                ZMQ.Socket socket = connectSender(context, address)) {
             boolean sent = socket.send(secretBytes);
             assertThat("ZMQ send returned false", sent, is(true));
 
@@ -225,8 +340,7 @@ public class KeyProducerJavaZmqTest {
         // duration of createSecrets() avoids the jeromq default LINGER=0 which would otherwise drop
         // any message still buffered in the PUSH socket's outbound queue when the context is closed.
         try (ZContext context = new ZContext();
-                ZMQ.Socket socket = context.createSocket(SocketType.PUSH)) {
-            socket.connect(address);
+                ZMQ.Socket socket = connectSender(context, address)) {
             for (int i = 0; i < numberOfSecrets; i++) {
                 byte[] secretBytes = new KeyProducerTestUtility().createIncrementedSecret((byte) i);
                 boolean sent = socket.send(secretBytes);
@@ -245,6 +359,7 @@ public class KeyProducerJavaZmqTest {
     }
 
     @Test
+    @Timeout(value = PRODUCER_CONNECTS_TIMEOUT_SECONDS, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
     public void createSecrets_invalidSecretLength_errorLogged() throws Exception {
         // arrange
         try (ZContext context = new ZContext();
@@ -254,10 +369,12 @@ public class KeyProducerJavaZmqTest {
             // Server socket (push) binds
             ZMQ.Socket sender = context.createSocket(SocketType.PUSH);
             sender.bind(address);
+            ZMQ.Socket handshakes = monitorHandshakes(context, sender);
 
             // Client config connects to that address
             CKeyProducerJavaZmq config = createConnectConfig(address);
             KeyProducerJavaZmq keyProducer = createKeyProducerJavaZmq(config);
+            awaitHandshake(handshakes);
 
             // Create invalid secret with wrong length (e.g., 16 bytes instead of 32)
             byte[] invalidSecretBytes = new byte[16];
@@ -286,6 +403,29 @@ public class KeyProducerJavaZmqTest {
 
             keyProducer.interrupt();
             sender.close();
+        }
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="connectSender">
+    @Test
+    public void connectSender_peerNeverAnswersTheHandshake_reconnectsWithinTheCap() throws Exception {
+        // arrange: a TCP peer that accepts and never sends a ZMTP greeting -- the state a sender is in
+        // when jeromq's poller race swallows its engine's registration (see the class comment)
+        try (ServerSocket silentPeer = new ServerSocket(0, 50, InetAddress.getLoopbackAddress());
+                ZContext context = new ZContext()) {
+            silentPeer.setSoTimeout(RECONNECT_AWAIT_MILLIS);
+            final String address = "tcp://127.0.0.1:" + silentPeer.getLocalPort();
+            connectSender(context, address);
+
+            // act
+            try (Socket first = silentPeer.accept()) {
+                // assert: the cap drops the stalled connection and jeromq connects again; without it
+                // the handshake timer (30 s) outlasts the wait and accept() times out
+                try (Socket second = silentPeer.accept()) {
+                    assertThat(second.isConnected(), is(true));
+                }
+            }
         }
     }
     // </editor-fold>

@@ -28,9 +28,6 @@ import org.lwjgl.opencl.CL10;
 @ToString
 public class OpenCLBuilder {
 
-    /** Number of dimensions reported by {@code CL_DEVICE_MAX_WORK_ITEM_SIZES}. */
-    private static final int MAX_WORK_ITEM_SIZE_DIMENSIONS = 3;
-
     /** The OpenCL version from which this project's compact filter mode is usable. */
     private static final ComparableVersion MINIMUM_COMPACT_MODE_VERSION = new ComparableVersion("2.0");
 
@@ -85,6 +82,10 @@ public class OpenCLBuilder {
      * @return the populated value object
      */
     private OpenCLDevice createOpenCLDevice(ClDeviceId device) {
+        // The sizes buffer must hold one entry per reported dimension: the specification only sets 3
+        // as the minimum, and clGetDeviceInfo refuses a smaller buffer with CL_INVALID_VALUE.
+        // cl_uint, widened for the value object; never queried as 64 bits (see class comment).
+        final int maxWorkItemDimensions = clApi.getDeviceInfoInt(device, CL10.CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS);
         return new OpenCLDevice(
                 device,
                 clApi.getDeviceInfoString(device, CL10.CL_DEVICE_NAME),
@@ -96,10 +97,9 @@ public class OpenCLBuilder {
                 clApi.getDeviceInfoLong(device, CL10.CL_DEVICE_TYPE),
                 clApi.getDeviceInfoInt(device, CL10.CL_DEVICE_ENDIAN_LITTLE) == CL_TRUE_AS_INT,
                 clApi.getDeviceInfoInt(device, CL10.CL_DEVICE_MAX_COMPUTE_UNITS),
-                // cl_uint, widened for the value object; never queried as 64 bits (see class comment)
-                clApi.getDeviceInfoInt(device, CL10.CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS),
-                longsToImmutableList(clApi.getDeviceInfoSizes(
-                        device, CL10.CL_DEVICE_MAX_WORK_ITEM_SIZES, MAX_WORK_ITEM_SIZE_DIMENSIONS)),
+                maxWorkItemDimensions,
+                longsToImmutableList(
+                        clApi.getDeviceInfoSizes(device, CL10.CL_DEVICE_MAX_WORK_ITEM_SIZES, maxWorkItemDimensions)),
                 clApi.getDeviceInfoSizes(device, CL10.CL_DEVICE_MAX_WORK_GROUP_SIZE, 1)[0],
                 clApi.getDeviceInfoInt(device, CL10.CL_DEVICE_MAX_CLOCK_FREQUENCY),
                 clApi.getDeviceInfoInt(device, CL10.CL_DEVICE_ADDRESS_BITS),

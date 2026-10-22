@@ -44,6 +44,7 @@ import net.ladenthin.bitcoinaddressfinder.util.NetworkParameterFactory;
 import org.bitcoinj.base.Coin;
 import org.bitcoinj.base.Network;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -87,6 +88,9 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
     /** Trailing window over which the read throughput (for the ETA) is averaged. */
     private static final long RATE_WINDOW_MILLIS = 60_000L;
 
+    /** The UTF-8 byte order mark as a decoded character; Windows editors write it at the start of a file. */
+    private static final char BYTE_ORDER_MARK = '\uFEFF';
+
     private static final Logger LOGGER = LoggerFactory.getLogger(AddressFilesToLMDB.class);
 
     private final @NonNull CAddressFilesToLMDB addressFilesToLMDB;
@@ -99,6 +103,12 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
 
     /** Count of lines rejected as unsupported/unparseable (incremented by the parser workers). */
     private final AtomicLong unsupportedCounter = new AtomicLong();
+
+    /** Lines whose amount column was present but not usable; they were stored with the default amount. */
+    private final AtomicLong unusableAmountCounter = new AtomicLong();
+
+    /** The first such line, quoted in the summary. */
+    private final AtomicReference<@Nullable String> firstUnusableAmountLine = new AtomicReference<>();
 
     /** Number of address files fully read so far (for "X/Y files" progress). */
     private final AtomicLong filesProcessed = new AtomicLong();
@@ -158,8 +168,14 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
                 LOGGER.info("Import " + files.size() + " address file(s) with " + threads + " parser thread(s), "
                         + "batched writes of " + writeBatchSize + ", queue capacity " + queueCapacity + " ...");
                 importFiles(network, persistence, files, threads, writeBatchSize, queueCapacity);
-                logSummary();
-                LOGGER.info("... import done.");
+                logSummary(lmdbConfigurationWrite.useStaticAmount);
+                if (shouldRun.get()) {
+                    LOGGER.info("... import done.");
+                } else {
+                    LOGGER.warn(
+                            "... import interrupted; the LMDB in {} is incomplete.",
+                            lmdbConfigurationWrite.lmdbDirectory);
+                }
             } catch (IOException e) {
                 throw new UncheckedIOException(
                         "Failed to import " + addressFilesToLMDB.addressesFiles.size() + " address file(s)", e);
@@ -246,6 +262,10 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
             String path = file.getAbsolutePath();
             LOGGER.info("process " + path);
             readFileLines(file, lineQueue, failure, progress);
+            if (!shouldRun.get()) {
+                LOGGER.warn("interrupted while reading " + path);
+                break;
+            }
             progress.fileFinished(file.length());
             LOGGER.info("finished (" + filesProcessed.incrementAndGet() + "/" + totalFiles + " files): " + path);
         }
@@ -272,9 +292,16 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(Files.newInputStream(file.toPath()), StandardCharsets.UTF_8))) {
             long charsRead = 0;
+            boolean firstLine = true;
             String line;
             while (shouldRun.get() && failure.get() == null && (line = reader.readLine()) != null) {
                 charsRead += line.length() + 1L;
+                if (firstLine) {
+                    firstLine = false;
+                    if (!line.isEmpty() && line.charAt(0) == BYTE_ORDER_MARK) {
+                        line = line.substring(1);
+                    }
+                }
                 if (!enqueue(lineQueue, line, failure)) {
                     return;
                 }
@@ -387,7 +414,7 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
             throws InterruptedException {
         // Both are stateless/immutable and reused for every line this worker parses.
         KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(true));
-        AddressTxtLine addressTxtLine = new AddressTxtLine();
+        AddressTxtLine addressTxtLine = new AddressTxtLine(this::recordUnusableAmount);
         while (failure.get() == null && shouldRun.get() && !(readingDone.get() && lineQueue.isEmpty())) {
             String line = lineQueue.poll(QUEUE_POLL_MILLIS, TimeUnit.MILLISECONDS);
             if (line == null) {
@@ -495,11 +522,35 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
         }
     }
 
-    private void logSummary() {
+    /**
+     * Counts a line whose amount was not usable and keeps the first one for the summary.
+     *
+     * @param line the line
+     */
+    private void recordUnusableAmount(String line) {
+        unusableAmountCounter.incrementAndGet();
+        firstUnusableAmountLine.compareAndSet(null, line);
+    }
+
+    /**
+     * Logs the import summary.
+     *
+     * @param useStaticAmount whether the amount column was ignored for this import
+     */
+    private void logSummary(boolean useStaticAmount) {
         LOGGER.info("Import summary: " + addressCounter.get() + " written, " + parsedCounter.get() + " parsed, "
                 + unsupportedCounter.get() + " unsupported, " + errors.size() + " error(s).");
         for (String error : errors) {
             LOGGER.info("Error in line: " + error);
+        }
+        long unusableAmounts = unusableAmountCounter.get();
+        // With useStaticAmount the amount column is not used at all, so an unusable one changes nothing.
+        if (unusableAmounts > 0 && !useStaticAmount) {
+            LOGGER.warn(
+                    "{} line(s) carried an amount that is not a non-negative whole number of satoshi; their"
+                            + " addresses were stored with the default amount of 1 satoshi. First: '{}'",
+                    unusableAmounts,
+                    Objects.requireNonNullElse(firstUnusableAmountLine.get(), ""));
         }
     }
 

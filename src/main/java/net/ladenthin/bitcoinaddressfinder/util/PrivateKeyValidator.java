@@ -33,7 +33,9 @@ public class PrivateKeyValidator {
      * for grid-based key generation without exceeding the secp256k1 private key limit.
      * <p>
      * This is necessary for chunked or grid-based generation where the base key is incremented
-     * by up to 2^batchSizeInBits - 1.
+     * by up to 2^batchSizeInBits - 1. The result is {@code n − 2^batchSizeInBits}, where {@code n}
+     * is {@link Secp256k1Constants#MAX_PRIVATE_KEY}: the grid starting there ends on {@code n − 1},
+     * the largest valid private key.
      *
      * @param batchSizeInBits The number of bits used for batch size (i.e., the number of keys generated in one grid chunk).
      *                        Must be in the range [0, {@link Secp256k1Constants#PRIVATE_KEY_MAX_NUM_BITS}].
@@ -50,9 +52,9 @@ public class PrivateKeyValidator {
         // 2^batchSizeInBits represents the maximum offset (grid size)
         BigInteger maxOffset = BigInteger.ONE.shiftLeft(batchSizeInBits);
 
-        // Subtract maxOffset - 1 to ensure that baseKey + (2^bits - 1) ≤ MAX_PRIVATE_KEY
-        BigInteger maxSafeKey =
-                Secp256k1Constants.MAX_PRIVATE_KEY.subtract(maxOffset).add(BigInteger.ONE);
+        // MAX_PRIVATE_KEY is the group order n and itself invalid, so the last key of the grid,
+        // baseKey + (2^bits - 1), must not exceed n - 1: baseKey <= n - 2^bits.
+        BigInteger maxSafeKey = Secp256k1Constants.MAX_PRIVATE_KEY.subtract(maxOffset);
 
         if (maxSafeKey.signum() < 0) {
             throw new IllegalStateException("batchSizeInBits=" + batchSizeInBits
@@ -61,6 +63,29 @@ public class PrivateKeyValidator {
         }
 
         return maxSafeKey;
+    }
+
+    /**
+     * Checks whether a grid base has its low {@code batchSizeInBits} bits clear.
+     *
+     * <p>The OpenCL kernel derives a work item's key as {@code base | offset}, an OR into the lowest
+     * 32-bit word, which equals the {@code base + offset} the host reports for a hit only for such a
+     * base. An unaligned base would make the kernel compute other keys than the ones named in its
+     * results.
+     *
+     * @param secretBase      the grid base
+     * @param batchSizeInBits the grid size exponent
+     * @return {@code true} if the low {@code batchSizeInBits} bits of {@code secretBase} are zero
+     * @throws IllegalArgumentException if {@code batchSizeInBits} is outside
+     *     [0, {@link Secp256k1Constants#PRIVATE_KEY_MAX_NUM_BITS}]
+     */
+    public boolean isAlignedToBatchSize(@NonNull BigInteger secretBase, int batchSizeInBits) {
+        if (batchSizeInBits < 0 || batchSizeInBits > Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS) {
+            throw new IllegalArgumentException("batchSizeInBits must be in [0, "
+                    + Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS + "] but was " + batchSizeInBits);
+        }
+        // the lowest set bit of a non-zero base must lie at or above batchSizeInBits; zero is aligned
+        return secretBase.signum() == 0 || secretBase.getLowestSetBit() >= batchSizeInBits;
     }
 
     /**
@@ -78,14 +103,16 @@ public class PrivateKeyValidator {
     /**
      * Checks whether a private key falls outside the valid range for secp256k1.
      * <p>
-     * Valid private keys are in the range [{@link Secp256k1Constants#MIN_VALID_PRIVATE_KEY}, {@link Secp256k1Constants#MAX_PRIVATE_KEY}].
+     * Valid private keys are in the range [{@link Secp256k1Constants#MIN_VALID_PRIVATE_KEY},
+     * {@link Secp256k1Constants#MAX_PRIVATE_KEY}). The upper bound is the group order {@code n}
+     * and is exclusive: {@code n·G} is the point at infinity, which has no public key.
      *
      * @param secret the private key to check
      * @return true if the key is outside the valid range; false otherwise
      */
     public boolean isOutsidePrivateKeyRange(@NonNull BigInteger secret) {
         return secret.compareTo(Secp256k1Constants.MIN_VALID_PRIVATE_KEY) < 0
-                || secret.compareTo(Secp256k1Constants.MAX_PRIVATE_KEY) > 0;
+                || secret.compareTo(Secp256k1Constants.MAX_PRIVATE_KEY) >= 0;
     }
 
     /**

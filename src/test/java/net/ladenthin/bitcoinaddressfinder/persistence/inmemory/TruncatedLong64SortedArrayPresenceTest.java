@@ -11,6 +11,8 @@ import static org.hamcrest.Matchers.is;
 import java.nio.ByteBuffer;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.InMemoryTestSupport.ListIterable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class TruncatedLong64SortedArrayPresenceTest {
 
@@ -106,5 +108,56 @@ class TruncatedLong64SortedArrayPresenceTest {
         assertThat(presence.containsAddress(hash20(0x20, 123)), is(true));
         // A first byte that was never inserted misses, even if the tail collides
         assertThat(presence.containsAddress(hash20(0x99, 123)), is(false));
+    }
+
+    /** A hash160 with a distinct value in every byte, so a change in any one byte is visible. */
+    private static byte[] distinctHash160() {
+        byte[] bytes = new byte[TruncatedLong64SortedArrayPresence.BYTES_PER_ADDRESS];
+        for (int i = 0; i < bytes.length; i++) {
+            bytes[i] = (byte) (0x11 * (i + 1));
+        }
+        return bytes;
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, 1, 2, 3, 4, 5, 6, 7, 8})
+    void nonMemberDifferingInOneOfTheFirstNineBytes_isAbsent(int differingByte) {
+        // Byte 0 picks the bucket, bytes 1-8 are the stored long: these 72 bits are compared.
+        byte[] stored = distinctHash160();
+        byte[] query = distinctHash160();
+        query[differingByte] ^= (byte) 0xFF;
+        TruncatedLong64SortedArrayPresence presence =
+                TruncatedLong64SortedArrayPresence.populateFrom(new ListIterable().add(ByteBuffer.wrap(stored)));
+
+        assertThat(presence.containsAddress(ByteBuffer.wrap(query)), is(false));
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19})
+    void nonMemberDifferingOnlyAfterByteEight_isReportedAsPresent(int differingByte) {
+        // Bytes 9-19 are not stored. A hash160 that matches an entry in the first 72 bits is a
+        // collision, and this backend reports it as present: LMDB is closed once the snapshot is
+        // built (requiresBackend() is false), so nothing verifies it and the consumer logs a hit.
+        byte[] stored = distinctHash160();
+        byte[] query = distinctHash160();
+        query[differingByte] ^= (byte) 0xFF;
+        TruncatedLong64SortedArrayPresence presence =
+                TruncatedLong64SortedArrayPresence.populateFrom(new ListIterable().add(ByteBuffer.wrap(stored)));
+
+        assertThat(presence.containsAddress(ByteBuffer.wrap(query)), is(true));
+        assertThat(presence.requiresBackend(), is(false));
+    }
+
+    @Test
+    void nonMemberDifferingInEveryByteAfterByteEight_isReportedAsPresent() {
+        byte[] stored = distinctHash160();
+        byte[] query = distinctHash160();
+        for (int i = 9; i < query.length; i++) {
+            query[i] = (byte) ~query[i];
+        }
+        TruncatedLong64SortedArrayPresence presence =
+                TruncatedLong64SortedArrayPresence.populateFrom(new ListIterable().add(ByteBuffer.wrap(stored)));
+
+        assertThat(presence.containsAddress(ByteBuffer.wrap(query)), is(true));
     }
 }

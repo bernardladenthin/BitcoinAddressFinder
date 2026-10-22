@@ -45,7 +45,13 @@ public class CKeyProducerJavaSocket extends CKeyProducerJavaReceiver {
      */
     public boolean broadcastResults = false;
 
-    /** TCP port the result server binds to, used only when {@link #broadcastResults} is set. */
+    /**
+     * TCP port the result server binds to, used only when {@link #broadcastResults} is set. It must
+     * differ from {@link #port} in {@link Mode#SERVER}, and in {@link Mode#CLIENT} when {@link #host}
+     * names this machine (a loopback or wildcard address, or an address of one of its interfaces): the
+     * result server binds every interface, so the client would connect to its own result server and
+     * read its JSON lines as secrets. The key producer refuses to start otherwise.
+     */
     public int resultPort = 5556;
 
     /** Operating mode: client or server */

@@ -7,8 +7,16 @@ import static net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat.BIG
 import static net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat.SHA256;
 import static net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat.STRING_SHA256;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.nullValue;
+import static org.hamcrest.Matchers.sameInstance;
+import static org.hamcrest.Matchers.startsWith;
 
 import com.google.common.hash.Hashing;
 import java.io.File;
@@ -21,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import net.ladenthin.bitcoinaddressfinder.CommonDataProvider;
 import net.ladenthin.bitcoinaddressfinder.MockConsumer;
@@ -28,16 +37,19 @@ import net.ladenthin.bitcoinaddressfinder.MockKeyProducer;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJavaSecretsFiles;
 import net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat;
 import net.ladenthin.bitcoinaddressfinder.configuration.UnknownSecretFormatException;
+import net.ladenthin.bitcoinaddressfinder.io.SecretsFile;
 import net.ladenthin.bitcoinaddressfinder.model.PublicKeyBytes;
 import net.ladenthin.bitcoinaddressfinder.statistics.RuntimeStatistics;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.util.NetworkParameterFactory;
+import nl.altindag.log.LogCaptor;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.FileUtils;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.crypto.ECKey;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -150,6 +162,76 @@ public class ProducerJavaSecretsFilesTest {
         assertThat(mockConsumer.publicKeyBytesArrayList.size(), is(equalTo(0)));
     }
 
+    /** A file whose reading {@code interrupt()} stopped part way is not processed and must not be reported so. */
+    @Test
+    public void produceKeys_interruptedWhileReadingAFile_doesNotReportTheFileOrTheRunAsProcessed() throws Exception {
+        File secretsFile = folder.resolve("secrets.txt").toFile();
+        Files.writeString(secretsFile.toPath(), "one\ntwo\nthree\n", StandardCharsets.UTF_8);
+        CProducerJavaSecretsFiles cProducerJavaSecretsFiles = new CProducerJavaSecretsFiles();
+        cProducerJavaSecretsFiles.secretsFiles = List.of(secretsFile.getAbsolutePath());
+        cProducerJavaSecretsFiles.secretFormat = STRING_SHA256;
+        cProducerJavaSecretsFiles.batchSizeInBits = 0;
+        AtomicReference<ProducerJavaSecretsFiles> producer = new AtomicReference<>();
+        MockConsumer interruptingConsumer = new MockConsumer() {
+            @Override
+            public void consumeKeys(PublicKeyBytes[] publicKeyBytes, @Nullable BigInteger secretBase)
+                    throws InterruptedException {
+                super.consumeKeys(publicKeyBytes, secretBase);
+                producer.get().interrupt();
+            }
+        };
+        producer.set(new ProducerJavaSecretsFiles(
+                cProducerJavaSecretsFiles,
+                interruptingConsumer,
+                keyUtility,
+                new MockKeyProducer(keyUtility, new Random(1)),
+                bitHelper,
+                new RuntimeStatistics()));
+
+        try (LogCaptor logCaptor = LogCaptor.forClass(ProducerJavaSecretsFiles.class)) {
+            producer.get().produceKeys();
+
+            assertThat(interruptingConsumer.publicKeyBytesArrayList.size(), is(equalTo(1)));
+            assertThat(logCaptor.getInfoLogs(), not(hasItem(startsWith("Finished processing"))));
+            assertThat(logCaptor.getInfoLogs(), not(hasItem("All secrets files processed.")));
+            assertThat(logCaptor.getWarnLogs(), hasItem(containsString("interrupted")));
+        }
+    }
+
+    /**
+     * An {@code interrupt()} that arrives after the loop checked the flag but before the next file's reader
+     * is registered must still stop that file: it is not read at all.
+     */
+    @Test
+    public void produceKeys_interruptBetweenFlagCheckAndReaderRegistration_doesNotReadTheFile() throws Exception {
+        File secretsFile = folder.resolve("secrets.txt").toFile();
+        Files.writeString(secretsFile.toPath(), "one\ntwo\nthree\n", StandardCharsets.UTF_8);
+        CProducerJavaSecretsFiles cProducerJavaSecretsFiles = new CProducerJavaSecretsFiles();
+        cProducerJavaSecretsFiles.secretsFiles = List.of(secretsFile.getAbsolutePath());
+        cProducerJavaSecretsFiles.secretFormat = STRING_SHA256;
+        cProducerJavaSecretsFiles.batchSizeInBits = 0;
+        MockConsumer mockConsumer = new MockConsumer();
+        ProducerJavaSecretsFiles producer =
+                new ProducerJavaSecretsFiles(
+                        cProducerJavaSecretsFiles,
+                        mockConsumer,
+                        keyUtility,
+                        new MockKeyProducer(keyUtility, new Random(1)),
+                        bitHelper,
+                        new RuntimeStatistics()) {
+                    @Override
+                    SecretsFile createSecretsFile(File file) {
+                        // interrupt() lands after the flag check, while no reader is registered yet
+                        interrupt();
+                        return super.createSecretsFile(file);
+                    }
+                };
+
+        producer.produceKeys();
+
+        assertThat(mockConsumer.publicKeyBytesArrayList.size(), is(equalTo(0)));
+    }
+
     @ParameterizedTest
     @MethodSource(CommonDataProvider.DATA_PROVIDER_CSECRET_FORMAT)
     public void produceKeys_filesConfigured_keysCreated(CSecretFormat cSecretFormat) throws Exception {
@@ -200,6 +282,77 @@ public class ProducerJavaSecretsFilesTest {
         assertThat(
                 mockConsumer.publicKeyBytesArrayList.get(5)[0],
                 is(equalTo(PrivateKey.WITH_SPECIAL_CHARACTER.getPublicKeyBytes())));
+    }
+
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_CSECRET_FORMAT)
+    public void produceKeys_filesConfiguredWithoutPrivateKeyIncrement_keysCreated(CSecretFormat cSecretFormat)
+            throws Exception {
+        // arrange — without batchUsePrivateKeyIncrement every secret goes through processSecrets
+        CProducerJavaSecretsFiles cProducerJavaSecretsFiles = new CProducerJavaSecretsFiles();
+        List<File> secretsFiles = createSecretsFiles(cSecretFormat);
+        cProducerJavaSecretsFiles.secretsFiles =
+                secretsFiles.stream().map(file -> file.getAbsolutePath()).collect(Collectors.toList());
+        cProducerJavaSecretsFiles.secretFormat = cSecretFormat;
+        cProducerJavaSecretsFiles.batchSizeInBits = 0;
+        cProducerJavaSecretsFiles.batchUsePrivateKeyIncrement = false;
+
+        MockConsumer mockConsumer = new MockConsumer();
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, new Random(1));
+        ProducerJavaSecretsFiles producerJavaSecretsFiles = new ProducerJavaSecretsFiles(
+                cProducerJavaSecretsFiles,
+                mockConsumer,
+                keyUtility,
+                mockKeyProducer,
+                bitHelper,
+                new RuntimeStatistics());
+
+        // act
+        producerJavaSecretsFiles.produceKeys();
+
+        // assert
+        assertThat(mockConsumer.publicKeyBytesArrayList.size(), is(equalTo(6)));
+        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[0], is(equalTo(PrivateKey.TEST.getPublicKeyBytes())));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(5)[0],
+                is(equalTo(PrivateKey.WITH_SPECIAL_CHARACTER.getPublicKeyBytes())));
+    }
+
+    /**
+     * A secrets file read without {@code batchUsePrivateKeyIncrement} hands its lines to the producer
+     * without the validation the other paths apply. Key 1 is a real key and must be checked (as a grid
+     * checks it), not end in an ERROR; key 0 is no key and must not end in one either.
+     */
+    @Test
+    public void produceKeys_withoutPrivateKeyIncrementKeysZeroAndOne_checkedAsInAGridWithoutAnError() throws Exception {
+        // arrange
+        File secretsFile = folder.resolve("edge-keys.txt").toFile();
+        Files.write(secretsFile.toPath(), List.of("0", "1"));
+        CProducerJavaSecretsFiles cProducerJavaSecretsFiles = new CProducerJavaSecretsFiles();
+        cProducerJavaSecretsFiles.secretsFiles = List.of(secretsFile.getAbsolutePath());
+        cProducerJavaSecretsFiles.secretFormat = CSecretFormat.BIG_INTEGER;
+        cProducerJavaSecretsFiles.batchSizeInBits = 0;
+        cProducerJavaSecretsFiles.batchUsePrivateKeyIncrement = false;
+        MockConsumer mockConsumer = new MockConsumer();
+        ProducerJavaSecretsFiles producerJavaSecretsFiles = new ProducerJavaSecretsFiles(
+                cProducerJavaSecretsFiles,
+                mockConsumer,
+                keyUtility,
+                new MockKeyProducer(keyUtility, new Random(1)),
+                bitHelper,
+                new RuntimeStatistics());
+
+        try (LogCaptor logCaptor = LogCaptor.forClass(AbstractProducer.class)) {
+            // act
+            producerJavaSecretsFiles.produceKeys();
+
+            // assert
+            assertThat(logCaptor.getErrorLogs(), is(empty()));
+        }
+        assertThat(mockConsumer.publicKeyBytesArrayList, hasSize(2));
+        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[0], is(sameInstance(PublicKeyBytes.INVALID_KEY_ONE)));
+        assertThat(mockConsumer.publicKeyBytesArrayList.get(1)[0], is(sameInstance(PublicKeyBytes.INVALID_KEY_ONE)));
+        assertThat(producerJavaSecretsFiles.getLastFailure(), is(nullValue()));
     }
     // </editor-fold>
 

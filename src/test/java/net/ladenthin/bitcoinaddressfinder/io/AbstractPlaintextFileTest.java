@@ -80,6 +80,26 @@ public class AbstractPlaintextFileTest {
     }
 
     @Test
+    public void readFile_moreFailingLinesThanKept_keepsTheFirstLinesAndCountsAll() throws IOException {
+        // a file in the wrong format fails on every line; keeping every line grows without bound
+        final int failing = ReadStatistic.MAX_STORED_ERRORS + 5;
+        File file = Files.createFile(folder.resolve("all-bad.txt")).toFile();
+        StringBuilder content = new StringBuilder();
+        for (int i = 0; i < failing; i++) {
+            content.append("bad ").append(i).append('\n');
+        }
+        Files.writeString(file.toPath(), content.toString());
+        ReadStatistic readStatistic = new ReadStatistic();
+        ThrowingPlaintextFile sut = new ThrowingPlaintextFile(file, readStatistic, new RuntimeException("parse error"));
+
+        sut.readFile();
+
+        assertThat(readStatistic.errors, hasSize(ReadStatistic.MAX_STORED_ERRORS));
+        assertThat(readStatistic.errors.get(0), is(equalTo("bad 0")));
+        assertThat(readStatistic.errorCount, is(equalTo((long) failing)));
+    }
+
+    @Test
     public void readFile_processLineThrowsRuntimeException_errorAddedToReadStatistic() throws IOException {
         // arrange
         File file = Files.createFile(folder.resolve("error.txt")).toFile();

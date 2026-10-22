@@ -227,6 +227,27 @@ public interface ClApi {
     ClEvent enqueueNDRangeKernel(
             ClCommandQueue commandQueue, ClKernel kernel, long[] globalWorkSize, boolean profilingEvent);
 
+    /**
+     * Enqueues a kernel launch with an explicit local work size (work-group size), instead of letting
+     * the runtime choose one.
+     *
+     * @param commandQueue   the queue to submit to
+     * @param kernel         the kernel to launch
+     * @param globalWorkSize the number of work items per dimension
+     * @param localWorkSize  the number of work items per work-group and dimension; as many dimensions
+     *     as {@code globalWorkSize}, each dividing the matching global size (OpenCL 1.x)
+     * @param profilingEvent whether to capture a profiling event for the launch
+     * @return the profiling event when requested, otherwise {@code null}
+     * @throws IllegalArgumentException if the two sizes have a different number of dimensions
+     */
+    @Nullable
+    ClEvent enqueueNDRangeKernel(
+            ClCommandQueue commandQueue,
+            ClKernel kernel,
+            long[] globalWorkSize,
+            long[] localWorkSize,
+            boolean profilingEvent);
+
     // ---------------------------------------------------------------------------------------
     // Buffers
     // ---------------------------------------------------------------------------------------

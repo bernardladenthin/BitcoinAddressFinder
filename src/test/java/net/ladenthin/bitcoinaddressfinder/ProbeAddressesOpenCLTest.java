@@ -4,10 +4,13 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.common.io.Resources;
@@ -349,7 +352,7 @@ public class ProbeAddressesOpenCLTest {
 
     @OpenCLTest
     @ParameterizedTest
-    @MethodSource(CommonDataProvider.DATA_PROVIDER_PRIVATE_KEYS_TOO_LARGE_WITH_CHUNK_SIZE)
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_PRIVATE_KEYS_TOO_LARGE_FOR_A_SMALL_GRID)
     public void setSrcPrivateKeyChunk_privateKeyTooLarge_throwsException(BigInteger privateKey, int chunkSize)
             throws IOException {
         new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
@@ -365,6 +368,134 @@ public class ProbeAddressesOpenCLTest {
             // lost in the JUnit 4 -> 5 migration.)
             assertThrows(PrivateKeyTooLargeException.class, () -> openClTask.setSrcPrivateKeyChunk(privateKey));
         }
+    }
+
+    /**
+     * A base one above the last allowed one starts a grid whose last key is the group order {@code n},
+     * which has no public key; it must be rejected, while the base below it is accepted.
+     */
+    @OpenCLTest
+    @Test
+    public void setSrcPrivateKeyChunk_gridWouldReachTheGroupOrder_throwsException() throws IOException {
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+
+        CProducerOpenCL producerOpenCL = new CProducerOpenCL();
+        producerOpenCL.batchSizeInBits = 8;
+        BigInteger lastBase = Secp256k1Constants.MAX_PRIVATE_KEY.subtract(BigInteger.ONE.shiftLeft(8));
+        try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
+            openCLContext.init();
+            OpenClTask openClTask = openCLContext.getOpenClTask().orElseThrow();
+
+            openClTask.setSrcPrivateKeyChunk(lastBase);
+            assertThrows(
+                    PrivateKeyTooLargeException.class,
+                    () -> openClTask.setSrcPrivateKeyChunk(lastBase.add(BigInteger.ONE)));
+        }
+    }
+
+    /**
+     * The last aligned grid that stays below n ({@code ...CD0364000} with 8 bits): every one of its
+     * 256 keys must come out of the kernel exactly as the CPU derives {@code base + i}. This is the
+     * upper edge the GPU computes; the next grid contains n and is refused (below).
+     */
+    @OpenCLTest
+    @Test
+    public void createKeys_lastAlignedGridBelowTheGroupOrder_computesEveryKeyCorrectly() throws IOException {
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+
+        CProducerOpenCL producerOpenCL = new CProducerOpenCL();
+        producerOpenCL.batchSizeInBits = 8;
+        BigInteger lastAlignedBase = Secp256k1Constants.MAX_PRIVATE_KEY.subtract(BigInteger.valueOf(0x141));
+        KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
+        try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
+            openCLContext.init();
+
+            try (OpenCLGridResult result = openCLContext.createKeys(lastAlignedBase)) {
+                assertPublicKeyBytesCalculatedCorrect(result.getPublicKeyBytes(), lastAlignedBase, false, keyUtility);
+            }
+        }
+    }
+
+    @OpenCLTest
+    @Test
+    public void createKeys_gridContainingTheGroupOrder_isRefused() throws IOException {
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+
+        CProducerOpenCL producerOpenCL = new CProducerOpenCL();
+        producerOpenCL.batchSizeInBits = 8;
+        // ...CD0364100: its keys run to ...CD03641FF and include n = ...CD0364141
+        BigInteger topGrid = Secp256k1Constants.MAX_PRIVATE_KEY.subtract(BigInteger.valueOf(0x41));
+        try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
+            openCLContext.init();
+
+            assertThrows(PrivateKeyTooLargeException.class, () -> openCLContext.createKeys(topGrid));
+        }
+    }
+
+    /**
+     * The kernel derives a work item's key as {@code base | offset}, an OR into the lowest word. For an
+     * unaligned base that is not {@code base + offset}, which is what the host reports for a hit, so the
+     * kernel would compute other keys than the ones named in the results, silently. The grid must be
+     * refused before the kernel runs, and not as a "too large" key, which the producer treats as the
+     * expected top-of-range skip. "Before the kernel runs" is pinned by the source argument: it is
+     * all zero after {@code init()} and still all zero after the refusal.
+     */
+    @OpenCLTest
+    @Test
+    public void createKeys_unalignedBase_isRefusedBeforeTheKernelRuns() throws IOException {
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+
+        CProducerOpenCL producerOpenCL = new CProducerOpenCL();
+        producerOpenCL.batchSizeInBits = 8;
+        try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
+            openCLContext.init();
+            ByteBuffer source = openCLContext
+                    .getOpenClTask()
+                    .orElseThrow()
+                    .getPrivateKeySourceArgument()
+                    .getByteBuffer();
+            assertThat(allBytesOf(source), is(equalTo(new byte[source.capacity()])));
+
+            IllegalArgumentException e = assertThrows(
+                    IllegalArgumentException.class, () -> openCLContext.createKeys(BigInteger.valueOf(0x1_0001)));
+            assertThat(e, is(not(instanceOf(PrivateKeyTooLargeException.class))));
+            assertThat(e.getMessage(), containsString("not aligned"));
+            // the kernel reads its key base from this argument, which executeKernel uploads only after
+            // setSrcPrivateKeyChunk wrote it: still all zero means nothing was prepared or dispatched
+            assertThat(allBytesOf(source), is(equalTo(new byte[source.capacity()])));
+        }
+    }
+
+    /**
+     * A base that is both unaligned and above the batch-size maximum: {@code n} itself, odd, so
+     * unaligned at 8 bits. The alignment check must win, because the producer treats a
+     * {@link PrivateKeyTooLargeException} as the expected top-of-range skip and logs it only as a
+     * warning; swapping the two checks would hide a caller defect as that skip.
+     */
+    @OpenCLTest
+    @Test
+    public void createKeys_unalignedBaseAboveTheMaximum_isRefusedAsUnaligned() throws IOException {
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+
+        CProducerOpenCL producerOpenCL = new CProducerOpenCL();
+        producerOpenCL.batchSizeInBits = 8;
+        BigInteger groupOrder = Secp256k1Constants.MAX_PRIVATE_KEY.add(BigInteger.ONE);
+        try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
+            openCLContext.init();
+
+            IllegalArgumentException e =
+                    assertThrows(IllegalArgumentException.class, () -> openCLContext.createKeys(groupOrder));
+
+            assertThat(e, is(not(instanceOf(PrivateKeyTooLargeException.class))));
+            assertThat(e.getMessage(), containsString("not aligned"));
+        }
+    }
+
+    /** Reads every byte of the buffer by absolute position, independent of its position and limit. */
+    private static byte[] allBytesOf(ByteBuffer buffer) {
+        byte[] bytes = new byte[buffer.capacity()];
+        buffer.duplicate().clear().get(bytes);
+        return bytes;
     }
 
     @ParameterizedTest

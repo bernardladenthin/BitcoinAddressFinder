@@ -7,6 +7,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.hamcrest.Matchers.equalTo;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 import java.io.File;
 import java.io.IOException;
@@ -14,6 +15,7 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -124,6 +126,42 @@ public class LMDBPersistenceTest {
             for (int i = 0; i < count; i++) {
                 assertThat(lmdbPersistence.getAmount(hash160s.get(i)).getValue(), is(equalTo(i + 1L)));
             }
+        }
+    }
+
+    /**
+     * A single batch may need more room than one increase step: AddressFilesToLMDB writes 32 768
+     * entries per transaction, and random keys into a large database dirty a page each. The map must
+     * keep growing until the batch fits; growing it once and giving up aborted the import.
+     */
+    @Test
+    public void putNewAmounts_batchLargerThanOneIncreaseStep_mapGrowsUntilTheBatchFits() throws IOException {
+        // arrange
+        File lmdbFolder = Files.createDirectory(folder.resolve("lmdb")).toFile();
+
+        CLMDBConfigurationWrite cLMDBConfigurationWrite = new CLMDBConfigurationWrite();
+        cLMDBConfigurationWrite.initialMapSizeInMiB = 1;
+        cLMDBConfigurationWrite.lmdbDirectory = lmdbFolder.getAbsolutePath();
+        cLMDBConfigurationWrite.increaseMapAutomatically = true;
+        cLMDBConfigurationWrite.increaseSizeInMiB = 1;
+
+        try (LMDBPersistence lmdbPersistence = new LMDBPersistence(cLMDBConfigurationWrite, persistenceUtils)) {
+            lmdbPersistence.init();
+
+            List<ByteBuffer> hash160s = new ArrayList<>(TOO_MUCH_KEYS_FOR_1MiB);
+            List<Coin> amounts = new ArrayList<>(TOO_MUCH_KEYS_FOR_1MiB);
+            for (int i = 0; i < TOO_MUCH_KEYS_FOR_1MiB; i++) {
+                byte[] hash160 = new byte[20];
+                random.nextBytes(hash160);
+                hash160s.add(byteBufferUtility.byteArrayToByteBuffer(hash160));
+                amounts.add(Coin.valueOf(i + 1L));
+            }
+
+            // act — one transaction that needs several MiB, with 1 MiB increase steps
+            lmdbPersistence.putNewAmounts(hash160s, amounts);
+
+            // assert
+            assertThat(lmdbPersistence.count(), is(equalTo((long) TOO_MUCH_KEYS_FOR_1MiB)));
         }
     }
 
@@ -292,6 +330,71 @@ public class LMDBPersistenceTest {
             assertThrows(
                     org.lmdbjava.Env.MapFullException.class,
                     () -> fillWithRandomKeys(TOO_MUCH_KEYS_FOR_1MiB, lmdbPersistence));
+        }
+    }
+
+    /**
+     * {@code increaseSizeInMiB = 0} disables growth just like {@code increaseMapAutomatically = false}
+     * (see {@link CLMDBConfigurationWrite#increaseSizeInMiB}): a full map rethrows at once and the map is
+     * never resized. Growing by zero and retrying would loop forever, since the retry can never fit.
+     */
+    @Test
+    public void putNewAmount_increaseSizeZero_fullMapThrowsWithoutResizing() throws IOException {
+        // arrange
+        File lmdbFolder = Files.createDirectory(folder.resolve("lmdb")).toFile();
+
+        CLMDBConfigurationWrite cLMDBConfigurationWrite = new CLMDBConfigurationWrite();
+        cLMDBConfigurationWrite.initialMapSizeInMiB = 1;
+        cLMDBConfigurationWrite.lmdbDirectory = lmdbFolder.getAbsolutePath();
+        cLMDBConfigurationWrite.increaseMapAutomatically = true;
+        cLMDBConfigurationWrite.increaseSizeInMiB = 0;
+
+        try (LMDBPersistence lmdbPersistence = new LMDBPersistence(cLMDBConfigurationWrite, persistenceUtils)) {
+            lmdbPersistence.init();
+
+            // act, assert
+            assertTimeoutPreemptively(
+                    Duration.ofSeconds(20),
+                    () -> assertThrows(
+                            org.lmdbjava.Env.MapFullException.class,
+                            () -> fillWithRandomKeys(TOO_MUCH_KEYS_FOR_1MiB, lmdbPersistence)));
+            assertThat(lmdbPersistence.getIncreasedCounter(), is(equalTo(0L)));
+            assertThat(lmdbPersistence.getDatabaseSize(), is(equalTo(new ByteConversion().mibToBytes(1L))));
+        }
+    }
+
+    /** The batch path honours {@code increaseSizeInMiB = 0} the same way as the single-entry path. */
+    @Test
+    public void putNewAmounts_increaseSizeZero_fullMapThrowsWithoutResizing() throws IOException {
+        // arrange
+        File lmdbFolder = Files.createDirectory(folder.resolve("lmdb")).toFile();
+
+        CLMDBConfigurationWrite cLMDBConfigurationWrite = new CLMDBConfigurationWrite();
+        cLMDBConfigurationWrite.initialMapSizeInMiB = 1;
+        cLMDBConfigurationWrite.lmdbDirectory = lmdbFolder.getAbsolutePath();
+        cLMDBConfigurationWrite.increaseMapAutomatically = true;
+        cLMDBConfigurationWrite.increaseSizeInMiB = 0;
+
+        try (LMDBPersistence lmdbPersistence = new LMDBPersistence(cLMDBConfigurationWrite, persistenceUtils)) {
+            lmdbPersistence.init();
+
+            List<ByteBuffer> hash160s = new ArrayList<>(TOO_MUCH_KEYS_FOR_1MiB);
+            List<Coin> amounts = new ArrayList<>(TOO_MUCH_KEYS_FOR_1MiB);
+            for (int i = 0; i < TOO_MUCH_KEYS_FOR_1MiB; i++) {
+                byte[] hash160 = new byte[20];
+                random.nextBytes(hash160);
+                hash160s.add(byteBufferUtility.byteArrayToByteBuffer(hash160));
+                amounts.add(Coin.valueOf(i + 1L));
+            }
+
+            // act, assert
+            assertTimeoutPreemptively(
+                    Duration.ofSeconds(20),
+                    () -> assertThrows(
+                            org.lmdbjava.Env.MapFullException.class,
+                            () -> lmdbPersistence.putNewAmounts(hash160s, amounts)));
+            assertThat(lmdbPersistence.getIncreasedCounter(), is(equalTo(0L)));
+            assertThat(lmdbPersistence.getDatabaseSize(), is(equalTo(new ByteConversion().mibToBytes(1L))));
         }
     }
 

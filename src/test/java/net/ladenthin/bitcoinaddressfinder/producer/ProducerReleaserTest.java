@@ -4,8 +4,12 @@
 package net.ladenthin.bitcoinaddressfinder.producer;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.sameInstance;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -16,6 +20,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import nl.altindag.log.LogCaptor;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -55,6 +61,53 @@ class ProducerReleaserTest {
         releaser.release(List.copyOf(producers));
 
         // assert
+        for (CountingProducer producer : producers) {
+            assertThat(producer.releaseCount(), is(equalTo(1)));
+        }
+    }
+
+    /**
+     * A producer still running after the wait timed out must not be released: its OpenCL kernel,
+     * queue and buffers would be freed while it may be using them inside the driver. Leaking them is
+     * the lesser harm at shutdown. The other producers are released as usual.
+     */
+    @Test
+    void release_producerStillRunningAfterTheWait_isNotReleasedAndTheOthersAre() {
+        // arrange
+        final ProducerReleaser releaser = new ProducerReleaser();
+        final List<CountingProducer> producers = createProducers();
+        producers.get(0).keepRunningPastTheWait();
+
+        try (LogCaptor logCaptor = LogCaptor.forClass(ProducerReleaser.class)) {
+            // act
+            releaser.release(List.copyOf(producers));
+
+            // assert
+            assertThat(producers.get(0).releaseCount(), is(equalTo(0)));
+            assertThat(producers.get(1).releaseCount(), is(equalTo(1)));
+            assertThat(producers.get(2).releaseCount(), is(equalTo(1)));
+            assertThat(logCaptor.getErrorLogs(), hasItem(containsString("still running")));
+        }
+    }
+
+    /**
+     * A producer whose release fails (an OpenCL release call raises on a driver error) must not keep the
+     * producers after it from being interrupted and released; the failure is still reported afterwards.
+     */
+    @Test
+    void release_firstProducerFailsToRelease_releasesTheOthersAndRethrows() {
+        // arrange
+        final ProducerReleaser releaser = new ProducerReleaser();
+        final List<CountingProducer> producers = createProducers();
+        final IllegalStateException failure = new IllegalStateException("clReleaseContext failed");
+        producers.get(0).failOnRelease(failure);
+
+        // act
+        IllegalStateException thrown =
+                assertThrows(IllegalStateException.class, () -> releaser.release(List.copyOf(producers)));
+
+        // assert
+        assertThat(thrown, is(sameInstance(failure)));
         for (CountingProducer producer : producers) {
             assertThat(producer.releaseCount(), is(equalTo(1)));
         }
@@ -143,9 +196,34 @@ class ProducerReleaserTest {
 
         private final AtomicInteger releaseCount = new AtomicInteger();
 
+        private @Nullable RuntimeException releaseFailure;
+
+        private volatile boolean stillRunningAfterTheWait;
+
+        /**
+         * Makes the producer report {@link ProducerState#RUNNING} after {@link #waitTillProducerNotRunning()}
+         * returned, as one does whose wait timed out.
+         */
+        void keepRunningPastTheWait() {
+            this.stillRunningAfterTheWait = true;
+        }
+
+        /**
+         * Makes {@link #releaseProducer()} throw {@code failure} after counting the call.
+         *
+         * @param failure the exception to throw on release
+         */
+        void failOnRelease(RuntimeException failure) {
+            this.releaseFailure = failure;
+        }
+
         @Override
         public void releaseProducer() {
             releaseCount.incrementAndGet();
+            RuntimeException localFailure = releaseFailure;
+            if (localFailure != null) {
+                throw localFailure;
+            }
         }
 
         /**
@@ -194,7 +272,7 @@ class ProducerReleaserTest {
 
         @Override
         public ProducerState getState() {
-            return ProducerState.NOT_RUNNING;
+            return stillRunningAfterTheWait ? ProducerState.RUNNING : ProducerState.NOT_RUNNING;
         }
 
         @Override

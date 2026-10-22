@@ -12,6 +12,7 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaReceiver
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import net.ladenthin.bitcoinaddressfinder.secret.NoMoreSecretsAvailableException;
 import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
+import org.apache.commons.codec.binary.Hex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,6 +69,32 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
         this.secretQueue = queue;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Reads one secret from the queue per element of the batch, waiting at most
+     * {@link #getReadTimeout()} for each (or indefinitely when it is negative).
+     *
+     * <p>When the wait for a secret times out after at least one secret of this batch was taken
+     * from the queue, the secrets taken so far are returned as a shorter batch: they are no
+     * longer in the queue, and throwing would leave them unchecked. The producer accepts a
+     * shorter batch of explicit secrets (see {@code AbstractProducer#produceKeys}). A timeout
+     * before the first secret of the batch still throws {@link NoMoreSecretsAvailableException},
+     * which ends the producer; with {@code returnStartSecretOnly} the batch is a single secret,
+     * so a timeout always throws there.
+     *
+     * <p>A received secret that does not have {@link OpenClKernelConstants#PRIVATE_KEY_MAX_NUM_BYTES}
+     * bytes ends the batch the same way: after at least one valid secret, the valid secrets are
+     * returned as a shorter batch, the invalid one is discarded and logged as a warning (in hex), and
+     * the secrets queued after it stay in the queue for the next call. As the first secret of a batch
+     * it throws {@link NoMoreSecretsAvailableException}. A shutdown or an interrupt in the middle of a
+     * batch still throws and discards the secrets read so far: the run ends there either way.
+     *
+     * @throws NoMoreSecretsAvailableException if no secret arrives within the read timeout before the
+     *         first secret of the batch, the first secret of the batch does not have
+     *         {@link OpenClKernelConstants#PRIVATE_KEY_MAX_NUM_BYTES} bytes, or shutdown is signalled
+     *         or the thread is interrupted while waiting
+     */
     @Override
     public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly) {
         verifyWorkSize(overallWorkSize, cKeyProducerJava.maxWorkSize);
@@ -91,17 +118,45 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
                 } else {
                     secret = secretQueue.poll(timeout, TimeUnit.MILLISECONDS);
                     if (secret == null) {
+                        if (i > 0) {
+                            // These secrets are out of the queue already; return them rather than lose them.
+                            LOGGER.debug(
+                                    "Timeout while waiting for secret ({} ms) after {} of {}; returning the partial batch.",
+                                    timeout,
+                                    i,
+                                    length);
+                            return copyPartialBatch(secrets, i);
+                        }
                         throw new NoMoreSecretsAvailableException("Timeout while waiting for secret (" + timeout
                                 + " ms, iteration " + i + "/" + length + ")");
                     }
                 }
 
                 if (isShutdownSentinel(secret)) {
+                    // Put it back for the next caller: several producers can share this key producer,
+                    // and each one blocked in take() needs its own wake-up -- signalShutdown() enqueues
+                    // the sentinel only once.
+                    if (!secretQueue.offer(SHUTDOWN_SENTINEL)) {
+                        LOGGER.trace("Shutdown sentinel not re-enqueued (queue full); other callers see shouldStop.");
+                    }
                     throw new NoMoreSecretsAvailableException(
                             "Shutdown sentinel received while waiting for secret at iteration " + i + "/" + length);
                 }
 
                 if (secret.length != OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES) {
+                    if (i > 0) {
+                        // As for a timeout: the valid secrets before it are out of the queue already;
+                        // return them rather than lose them. The secrets after it stay queued.
+                        LOGGER.warn(
+                                "Discarded a secret of invalid length {} (expected {} bytes) after {} of {};"
+                                        + " returning the partial batch. Secret: {}",
+                                secret.length,
+                                OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES,
+                                i,
+                                length,
+                                Hex.encodeHexString(secret));
+                        return copyPartialBatch(secrets, i);
+                    }
                     throw new NoMoreSecretsAvailableException("Invalid secret length: " + secret.length);
                 }
 
@@ -119,6 +174,19 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
         }
 
         return secrets;
+    }
+
+    /**
+     * Copies the first {@code count} secrets of a batch that ends early.
+     *
+     * @param secrets the batch being filled
+     * @param count   the number of secrets read so far (at least one)
+     * @return a new array holding exactly those secrets
+     */
+    private static BigInteger[] copyPartialBatch(BigInteger[] secrets, int count) {
+        BigInteger[] partialBatch = new BigInteger[count];
+        System.arraycopy(secrets, 0, partialBatch, 0, count);
+        return partialBatch;
     }
 
     /**
@@ -165,7 +233,7 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
     protected void addSecret(byte[] secret) {
         if (!shouldStop) {
             if (!secretQueue.offer(secret)) {
-                LOGGER.error("Secret queue is full, ignore secret: {}", secret);
+                LOGGER.error("Secret queue is full, ignore secret: {}", Hex.encodeHexString(secret));
             }
         }
     }

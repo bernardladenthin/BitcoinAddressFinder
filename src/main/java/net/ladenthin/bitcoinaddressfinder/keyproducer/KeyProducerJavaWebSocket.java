@@ -33,6 +33,12 @@ public class KeyProducerJavaWebSocket extends AbstractKeyProducerQueueBuffered<C
     private final WebSocketEndpoint endpoint;
 
     /**
+     * Set by {@link #shareEndpoint()}: a result broadcaster sends on the endpoint and stops it itself,
+     * so {@link #interrupt()} leaves it running.
+     */
+    private volatile boolean endpointShared;
+
+    /**
      * Creates a new WebSocket-based key producer. The server is NOT started here; the caller must
      * invoke {@link #start()} afterwards.
      *
@@ -67,6 +73,21 @@ public class KeyProducerJavaWebSocket extends AbstractKeyProducerQueueBuffered<C
         return endpoint;
     }
 
+    /**
+     * Hands the endpoint to a result broadcaster, which from now on stops it.
+     *
+     * <p>Interrupting this key producer then only stops the inbound side. A {@code Ctrl+C} interrupts
+     * the key producers first, to wake the producers waiting for their next secret, while the consumer
+     * is still checking what they queued; stopping the shared server there lost the reports of exactly
+     * those batches.
+     *
+     * @return the endpoint backing this producer
+     */
+    public WebSocketEndpoint shareEndpoint() {
+        endpointShared = true;
+        return endpoint;
+    }
+
     @Override
     public void start() {
         endpoint.setMessageHandler(message -> {
@@ -87,9 +108,15 @@ public class KeyProducerJavaWebSocket extends AbstractKeyProducerQueueBuffered<C
         return cKeyProducerJava.timeoutMillis;
     }
 
+    /**
+     * Wakes every caller blocked in {@code createSecrets()} and ignores secrets from now on; stops the
+     * endpoint too unless a result broadcaster took it over through {@link #shareEndpoint()}.
+     */
     @Override
     public void interrupt() {
         signalShutdown(); // wakes any caller blocked in createSecrets()
-        endpoint.stop();
+        if (!endpointShared) {
+            endpoint.stop();
+        }
     }
 }

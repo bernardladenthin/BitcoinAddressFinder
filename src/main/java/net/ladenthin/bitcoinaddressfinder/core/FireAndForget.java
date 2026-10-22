@@ -35,12 +35,18 @@ import java.lang.annotation.Target;
  * annotation's Javadoc rather than being repeated in a comment at every call
  * site.</p>
  *
- * <p>Canonical usage at a call site:</p>
+ * <p>Canonical usage, on the method that makes the call:</p>
  * <pre>{@code
  * @FireAndForget("lifecycle via Producer.interrupt() shutdown")
  * @SuppressWarnings("FutureReturnValueIgnored")
- * Object unused = producerExecutorService.submit(producer);
+ * public void startProducer() {
+ *     producerExecutorService.submit(producer);
+ * }
  * }</pre>
+ *
+ * <p>Not {@code Object unused = executor.submit(...)} at the call: that silences Error Prone as
+ * well, but CodeQL reports the variable as never read, so the suppression sits on the method and
+ * the call stands alone.</p>
  */
 @Documented
 @Retention(RetentionPolicy.CLASS)

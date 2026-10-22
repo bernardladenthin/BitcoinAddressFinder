@@ -5,10 +5,14 @@ package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.util.concurrent.Executors;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 import lombok.ToString;
-import net.ladenthin.bitcoinaddressfinder.core.FireAndForget;
 import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.WebSocketServer;
@@ -32,6 +36,13 @@ public class WebSocketEndpoint {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(WebSocketEndpoint.class);
 
+    /**
+     * How long {@link #start()} waits for the server to report whether it is listening. Binding is
+     * immediate; the bound only keeps a server that never reports (stopped before its selector thread
+     * ran) from blocking the start forever.
+     */
+    private static final long START_TIMEOUT_MILLIS = 10_000L;
+
     /** Receives binary messages arriving from a connected client. */
     @FunctionalInterface
     public interface MessageHandler {
@@ -52,8 +63,20 @@ public class WebSocketEndpoint {
     @ToString.Exclude
     private @Nullable MessageHandler messageHandler;
 
+    /** Set by {@link #stop()}; a message sent after it reaches no client. */
+    private volatile boolean stopped;
+
+    /** Set by the first message after {@link #stop()}, so that message is logged once and not per batch. */
     @ToString.Exclude
-    private @Nullable Supplier<@Nullable String> greetingSupplier;
+    private final AtomicBoolean broadcastAfterStopReported = new AtomicBoolean();
+
+    /**
+     * Set after the server started (the result broadcaster is built after the key producer) and read in
+     * {@code onOpen} on Java-WebSocket's worker thread, so the write needs a happens-before edge to the
+     * read: without {@code volatile} a client could, under the memory model, never see the greeting.
+     */
+    @ToString.Exclude
+    private volatile @Nullable Supplier<@Nullable String> greetingSupplier;
 
     /**
      * Creates an endpoint bound to the given port. The server is not started here.
@@ -118,10 +141,19 @@ public class WebSocketEndpoint {
     }
 
     /**
-     * Starts the server on a background thread. Calling this more than once replaces the server;
-     * the intended usage is a single invocation.
+     * Starts the server on a background thread and waits until it listens. Calling this more than once
+     * replaces the server; the intended usage is a single invocation.
+     *
+     * <p>Java-WebSocket binds on its own selector thread and reports the outcome only through
+     * {@code onStart} or {@code onError}; waiting for it here is what makes a port that cannot be bound
+     * a start failure, as it is for the socket key producer. Without the wait the start returned
+     * normally, and a key producer with {@code timeoutMillis -1} then waited for a secret forever.
+     *
+     * @throws IllegalStateException if the server cannot listen on the port, does not report within
+     *                               {@link #START_TIMEOUT_MILLIS}, or the wait is interrupted
      */
     public void start() {
+        final CompletableFuture<Void> started = new CompletableFuture<>();
         final WebSocketServer localServer = new WebSocketServer(new InetSocketAddress(port)) {
             @Override
             public void onOpen(WebSocket conn, ClientHandshake handshake) {
@@ -149,13 +181,19 @@ public class WebSocketEndpoint {
             }
 
             @Override
-            public void onError(WebSocket conn, Exception ex) {
+            public void onError(@Nullable WebSocket conn, Exception ex) {
                 LOGGER.error("WebSocket error", ex);
+                if (conn == null) {
+                    // A server-level error, e.g. the port could not be bound. Once the server started,
+                    // the future is already complete and this completion has no effect.
+                    started.completeExceptionally(ex);
+                }
             }
 
             @Override
             public void onStart() {
                 LOGGER.info("WebSocket server started on port: {}", getPort());
+                started.complete(null);
             }
 
             @Override
@@ -165,9 +203,53 @@ public class WebSocketEndpoint {
         };
         webSocketServer = localServer;
 
-        @FireAndForget("lifecycle via stop()")
-        @SuppressWarnings("FutureReturnValueIgnored")
-        Object unused = Executors.newSingleThreadExecutor().submit(localServer::start);
+        // WebSocketServer.start() only starts the server's own selector thread and returns, so it needs
+        // no executor of ours -- the one it used to be submitted to left a non-daemon worker thread
+        // behind that kept the JVM alive after stop().
+        localServer.start();
+        awaitListening(localServer, started);
+    }
+
+    /**
+     * Waits until the server reported that it listens, and fails the start otherwise.
+     *
+     * @param localServer the server just started
+     * @param started     completed by {@code onStart}, completed exceptionally by a server-level error
+     * @throws IllegalStateException if the server does not listen
+     */
+    private void awaitListening(WebSocketServer localServer, Future<Void> started) {
+        try {
+            started.get(START_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+        } catch (ExecutionException e) {
+            final Throwable cause = e.getCause() != null ? e.getCause() : e;
+            stopServer(localServer);
+            throw new IllegalStateException(
+                    "The WebSocket key producer cannot listen on port " + port + ": " + cause.getMessage(), cause);
+        } catch (TimeoutException e) {
+            stopServer(localServer);
+            throw new IllegalStateException(
+                    "The WebSocket key producer did not start listening on port " + port + " within "
+                            + START_TIMEOUT_MILLIS + " ms.",
+                    e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            stopServer(localServer);
+            throw new IllegalStateException(
+                    "Interrupted while the WebSocket key producer was starting on port " + port + ".", e);
+        }
+    }
+
+    /**
+     * Stops a server, keeping the interrupt flag if the stop is interrupted.
+     *
+     * @param localServer the server to stop
+     */
+    private static void stopServer(WebSocketServer localServer) {
+        try {
+            localServer.stop();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     /**
@@ -179,6 +261,15 @@ public class WebSocketEndpoint {
      * @param message the message to send
      */
     public void broadcast(String message) {
+        if (stopped) {
+            if (broadcastAfterStopReported.compareAndSet(false, true)) {
+                LOGGER.warn(
+                        "The WebSocket server on port {} is already stopped; messages sent from now on reach no"
+                                + " client.",
+                        port);
+            }
+            return;
+        }
         final WebSocketServer localServer = webSocketServer;
         if (localServer == null) {
             return;
@@ -192,13 +283,10 @@ public class WebSocketEndpoint {
 
     /** Stops the server, if it was started. */
     public void stop() {
+        stopped = true;
         final WebSocketServer localServer = webSocketServer;
         if (localServer != null) {
-            try {
-                localServer.stop();
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
+            stopServer(localServer);
         }
     }
 }

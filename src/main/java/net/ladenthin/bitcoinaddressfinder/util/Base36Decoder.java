@@ -29,6 +29,11 @@ public class Base36Decoder {
      * @throws NumberFormatException if the input string is not valid Base36
      */
     public byte[] decodeBase36ToFixedLengthBytes(String base36Encoded, final int hashLength) {
+        // BigInteger accepts a leading sign, which Base36 does not have: "-1" would decode to the
+        // two's-complement bytes of -1 instead of being rejected.
+        if (!base36Encoded.isEmpty() && (base36Encoded.charAt(0) == '-' || base36Encoded.charAt(0) == '+')) {
+            throw new NumberFormatException("Base36 has no sign: " + base36Encoded);
+        }
         byte[] raw = new BigInteger(base36Encoded, 36).toByteArray();
         byte[] hash160 = new byte[hashLength];
         int srcPos = Math.max(0, raw.length - hashLength);

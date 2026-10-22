@@ -3,6 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.statistics;
 
+import java.math.BigDecimal;
+import java.math.MathContext;
+import java.math.RoundingMode;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -39,7 +42,7 @@ public class Statistics {
      * @param windowGeneratedPerSecond     current candidate-generation throughput in keys/second,
      *                                     averaged over the same trailing window
      * @param rateWindowSeconds            the trailing window (seconds) the rate is averaged over
-     * @param keysSumOfTimeToCheckContains cumulative time (ms) spent in presence lookups
+     * @param keysSumOfTimeToCheckContains cumulative time (ns) spent in presence lookups
      * @param generatedKeysByProducer      generated-candidate counts keyed by producer label
      *                                     ({@code "<keyProducerId> (<Strategy>, <CPU|GPU>)"}); lets
      *                                     concurrently running producers be told apart, and be
@@ -93,7 +96,7 @@ public class Statistics {
                 + "] [Producers running: " + producersRunning + "] [Consumers running: " + consumersRunning
                 + "] [Consumer ready for work (queue empty): " + consumerReady
                 + "] [Producer blocked (queue full): " + producerBlocked + "] [Average contains time: "
-                + averageContainsTime + " ms] [keys queue size: " + keysQueueSize + "] [Hits: " + hits + "]";
+                + averageContainsTime + " ns] [keys queue size: " + keysQueueSize + "] [Hits: " + hits + "]";
     }
 
     /**
@@ -114,37 +117,96 @@ public class Statistics {
      * Formats a per-second rate, auto-scaling to k/s, M/s or G/s so the number stays readable across
      * the whole range (a starved consumer at a few thousand/s up to a GPU in the G/s).
      *
+     * <p>The unit is chosen on the value as it will be displayed: a rate that rounds up to a thousand
+     * of its unit is shown in the next one ({@code 999_999.9} &#x2192; {@code "1.000 M/s"}, not
+     * {@code "1000.0 k/s"}). See {@link #roundForDisplay(double)}.
+     *
      * @param perSecond the rate in units per second
      * @return e.g. {@code "1.400 G/s"}, {@code "130.0 M/s"}, {@code "2.013 k/s"} or {@code "412/s"}
      */
     static String formatRate(double perSecond) {
-        if (perSecond >= 1_000_000_000.0) {
-            return withSignificantDigits(perSecond / 1_000_000_000.0) + " G/s";
+        return formatScaled(perSecond, "/s");
+    }
+
+    /**
+     * Scales {@code value} into G, M or k, chosen on {@link #roundForDisplay(double)} of the value so
+     * the rounding cannot carry it to a thousand of a unit, and renders it with
+     * {@link #withSignificantDigits(double)}; below a thousand it is rendered as a whole number.
+     *
+     * @param value  the value to format
+     * @param suffix appended after the unit, e.g. {@code "/s"} for a rate or {@code ""} for a count
+     * @return the scaled value with its unit and suffix
+     */
+    private static String formatScaled(double value, String suffix) {
+        double rounded = roundForDisplay(value);
+        if (rounded >= 1_000_000_000.0d) {
+            return withSignificantDigits(rounded / 1_000_000_000.0d) + " G" + suffix;
         }
-        if (perSecond >= 1_000_000.0) {
-            return withSignificantDigits(perSecond / 1_000_000.0) + " M/s";
+        if (rounded >= 1_000_000.0d) {
+            return withSignificantDigits(rounded / 1_000_000.0d) + " M" + suffix;
         }
-        if (perSecond >= 1_000.0) {
-            return withSignificantDigits(perSecond / 1_000.0) + " k/s";
+        if (rounded >= 1_000.0d) {
+            return withSignificantDigits(rounded / 1_000.0d) + " k" + suffix;
         }
-        return Math.round(perSecond) + "/s";
+        return Math.round(value) + suffix;
+    }
+
+    /**
+     * Rounds {@code value} to the precision it is displayed with, before the unit is chosen: to its
+     * integer digits below a thousand (a whole number, where no unit is shown and no decimals either),
+     * and to {@link #SIGNIFICANT_DIGITS} significant digits from a thousand on, where the value has
+     * at least four. Choosing the unit on the unrounded value let {@code 999_999.9} pick k and then
+     * round to {@code "1000.0 k/s"}.
+     *
+     * <p>One rounding with a computed precision rather than a branch at a thousand: both branches
+     * agreed at exactly a thousand, so the boundary of that comparison could not be observed, and a
+     * mutation test cannot tell {@code <} from {@code <=} there.
+     *
+     * <p>A value that is not finite is returned unchanged; {@link #formatScaled} renders it as before
+     * (a {@code NaN} rate as {@code "0/s"}, an infinite one as {@code "Infinity G/s"}). A negative or
+     * fractional value rounds to one digit at
+     * least, which {@link #formatScaled} never shows: below a thousand it renders the whole number of
+     * the original value.
+     *
+     * @param value the value to round
+     * @return the value rounded to its displayed precision
+     */
+    private static double roundForDisplay(double value) {
+        if (!Double.isFinite(value)) {
+            return value;
+        }
+        int precision = Math.max(1, Math.min(SIGNIFICANT_DIGITS, integerDigits(value)));
+        return BigDecimal.valueOf(value)
+                .round(new MathContext(precision, RoundingMode.HALF_UP))
+                .doubleValue();
+    }
+
+    /**
+     * The number of digits before the decimal point of a positive value ({@code 999.5} has three,
+     * {@code 1000} four); zero or less for a value below one, and one for a value that is not positive
+     * ({@code log10} of zero or a negative number has no integer part to count).
+     *
+     * @param value the value
+     * @return its integer digits
+     */
+    private static int integerDigits(double value) {
+        return (int) Math.floor(Math.log10(value)) + 1;
     }
 
     /**
      * Renders a value that has already been divided into its unit — so it lies in {@code [1, 1000)} —
      * with as many decimals as it takes to reach {@link #SIGNIFICANT_DIGITS}.
      *
-     * <p>A value within rounding distance of the next unit renders as {@code "1000.0"} rather than
-     * being promoted (e.g. {@code 999_999_999} → {@code "1000.0 M/s"}). Promoting it would mean
-     * formatting twice to discover the carry, for a cosmetic gain in a band a live rate crosses in
-     * one sample.
+     * <p>The value has already been rounded to {@link #SIGNIFICANT_DIGITS} by
+     * {@link #roundForDisplay(double)} and its unit chosen on that, so it never renders as
+     * {@code "1000.0"}; only above the largest unit (a thousand G or more) does it have four integer
+     * digits.
      *
      * @param scaled the value in its unit, in {@code [1, 1000)}
      * @return the value rendered with a constant number of significant digits
      */
     private static String withSignificantDigits(double scaled) {
-        int integerDigits = (int) Math.floor(Math.log10(scaled)) + 1;
-        int decimals = Math.max(0, SIGNIFICANT_DIGITS - integerDigits);
+        int decimals = Math.max(0, SIGNIFICANT_DIGITS - integerDigits(scaled));
         // A literal format string per branch, rather than one assembled from `decimals` or looked up
         // in an array. Both of those are still "computed" to a static analyser even when every input
         // is our own arithmetic, and spelling the three cases out documents the only shapes this
@@ -203,22 +265,15 @@ public class Statistics {
 
     /**
      * Formats an absolute count, auto-scaling to k, M or G on the same thresholds as
-     * {@link #formatRate(double)} so the two read consistently within one line.
+     * {@link #formatRate(double)} so the two read consistently within one line, including the carry
+     * into the next unit ({@code 999_999_999} &#x2192; {@code "1.000 G"}).
      *
      * @param count the count to format
      * @return e.g. {@code "19.39 G"}, {@code "130.0 M"}, {@code "3.000 k"} or {@code "412"}
      */
     static String formatCount(long count) {
-        if (count >= 1_000_000_000L) {
-            return withSignificantDigits(count / 1_000_000_000.0d) + " G";
-        }
-        if (count >= 1_000_000L) {
-            return withSignificantDigits(count / 1_000_000.0d) + " M";
-        }
-        if (count >= 1_000L) {
-            return withSignificantDigits(count / 1_000.0d) + " k";
-        }
-        return String.valueOf(count);
+        // The display keeps four significant digits, far fewer than a double carries.
+        return formatScaled((double) count, "");
     }
 
     /**

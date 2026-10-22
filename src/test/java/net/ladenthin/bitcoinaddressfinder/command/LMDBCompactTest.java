@@ -8,9 +8,13 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import net.ladenthin.bitcoinaddressfinder.LMDBBase;
 import net.ladenthin.bitcoinaddressfinder.configuration.CCompactLMDB;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
@@ -20,6 +24,7 @@ import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticAddressesFiles;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.P2PKH;
 import nl.altindag.log.LogCaptor;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -78,5 +83,161 @@ public class LMDBCompactTest extends LMDBBase {
         config.targetDirectory = sourceDirectory.getAbsolutePath();
 
         assertThrows(IllegalArgumentException.class, () -> new LMDBCompact(config).run());
+    }
+
+    /** A target that names the source through another spelling must be refused before anything is deleted. */
+    @Test
+    public void compactLMDB_targetIsSourceSpelledDifferently_throwsAndKeepsTheSourceDatabase() throws Exception {
+        StaticAddressesFiles staticAddressesFiles = new StaticAddressesFiles();
+        File sourceDirectory = new TestAddressesLMDB().createTestLMDB(folder, staticAddressesFiles, true, false);
+        File sourceDataFile = new File(sourceDirectory, "data.mdb");
+        long sourceBytes = sourceDataFile.length();
+
+        CCompactLMDB config = new CCompactLMDB();
+        config.lmdbConfigurationReadOnly.lmdbDirectory = sourceDirectory.getAbsolutePath();
+        config.targetDirectory = new File(sourceDirectory, ".").getPath();
+
+        assertThrows(IllegalArgumentException.class, () -> new LMDBCompact(config).run());
+        assertThat(sourceDataFile.exists(), is(true));
+        assertThat(sourceDataFile.length(), is(equalTo(sourceBytes)));
+    }
+
+    /**
+     * The symlink case F31 names: a link to the source is the source, which only the canonical
+     * comparison sees ({@code Path.normalize()} removes {@code "."} but follows no link). The
+     * empty-target check would stop such a run later too, but with an {@link IllegalStateException}
+     * at {@code lock.mdb}; the type and message pin the canonical check itself.
+     */
+    @Test
+    public void compactLMDB_targetIsASymlinkToTheSource_throwsAndKeepsTheSourceDatabase() throws Exception {
+        StaticAddressesFiles staticAddressesFiles = new StaticAddressesFiles();
+        File sourceDirectory = new TestAddressesLMDB().createTestLMDB(folder, staticAddressesFiles, true, false);
+        File sourceDataFile = new File(sourceDirectory, "data.mdb");
+        long sourceBytes = sourceDataFile.length();
+        Path link = folder.resolve("lmdb-link");
+        try {
+            Files.createSymbolicLink(link, sourceDirectory.toPath());
+        } catch (UnsupportedOperationException | IOException e) {
+            Assumptions.abort("symbolic links not available: " + e);
+        }
+
+        CCompactLMDB config = new CCompactLMDB();
+        config.lmdbConfigurationReadOnly.lmdbDirectory = sourceDirectory.getAbsolutePath();
+        config.targetDirectory = link.toString();
+
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> new LMDBCompact(config).run());
+        assertThat(e.getMessage(), containsString("must differ"));
+        assertThat(sourceDataFile.exists(), is(true));
+        assertThat(sourceDataFile.length(), is(equalTo(sourceBytes)));
+        assertThat(Files.readSymbolicLink(link), is(equalTo(sourceDirectory.toPath())));
+    }
+
+    /**
+     * The helper behind the identity check: a symbolic link resolves to its target. On Windows
+     * {@link File#getCanonicalFile()} does not resolve links (JDK-8003887), which is how the symlink
+     * case above reached the empty-target check in the Windows run of PR #395; {@code Path.toRealPath}
+     * does on every platform. Aborted where the file system cannot create links.
+     */
+    @Test
+    public void canonical_symbolicLinkToADirectory_isThatDirectory() throws Exception {
+        Path real = Files.createDirectory(folder.resolve("real"));
+        Path link = createSymbolicLinkOrAbort(folder.resolve("link"), real);
+
+        assertThat(
+                LMDBCompact.canonical(link.toFile()),
+                is(equalTo(real.toRealPath().toFile())));
+        assertThat(LMDBCompact.canonical(link.toFile()), is(equalTo(LMDBCompact.canonical(real.toFile()))));
+    }
+
+    /** A path below a link that does not exist yet (the usual target directory) resolves the link too. */
+    @Test
+    public void canonical_missingPathBelowASymbolicLink_resolvesTheLink() throws Exception {
+        Path real = Files.createDirectory(folder.resolve("real"));
+        Path link = createSymbolicLinkOrAbort(folder.resolve("link"), real);
+
+        File resolved = LMDBCompact.canonical(new File(link.toFile(), "lmdb_compact"));
+
+        assertThat(
+                resolved, is(equalTo(real.toRealPath().resolve("lmdb_compact").toFile())));
+    }
+
+    /** A path that does not exist is still returned absolute and without {@code .} or {@code ..}. */
+    @Test
+    public void canonical_missingPath_isAbsoluteAndNormalized() throws Exception {
+        File resolved = LMDBCompact.canonical(new File(folder.toFile(), "a/./b/../c"));
+
+        assertThat(
+                resolved,
+                is(equalTo(folder.toRealPath().resolve("a").resolve("c").toFile())));
+    }
+
+    private static Path createSymbolicLinkOrAbort(Path link, Path target) {
+        try {
+            return Files.createSymbolicLink(link, target);
+        } catch (UnsupportedOperationException | IOException e) {
+            return Assumptions.abort("symbolic links not available: " + e);
+        }
+    }
+
+    /** An interrupt before the run starts must stop it before anything is created or deleted. */
+    @Test
+    public void compactLMDB_interruptedBeforeRun_writesNothing() throws Exception {
+        StaticAddressesFiles staticAddressesFiles = new StaticAddressesFiles();
+        File sourceDirectory = new TestAddressesLMDB().createTestLMDB(folder, staticAddressesFiles, true, false);
+        File targetDirectory = folder.resolve("lmdb_compact_interrupted").toFile();
+
+        CCompactLMDB config = new CCompactLMDB();
+        config.lmdbConfigurationReadOnly.lmdbDirectory = sourceDirectory.getAbsolutePath();
+        config.targetDirectory = targetDirectory.getAbsolutePath();
+
+        LMDBCompact compact = new LMDBCompact(config);
+        compact.interrupt();
+        compact.run();
+
+        assertThat(targetDirectory.exists(), is(false));
+    }
+
+    /**
+     * A target that holds another database with its lock file is refused before its data file is deleted:
+     * {@code MDB_CP_COMPACT} needs a directory without files, so deleting only {@code data.mdb} destroyed
+     * that database and then failed anyway.
+     */
+    @Test
+    public void compactLMDB_targetHoldsAnotherDatabase_keepsItsDataFile() throws Exception {
+        StaticAddressesFiles staticAddressesFiles = new StaticAddressesFiles();
+        File sourceDirectory = new TestAddressesLMDB().createTestLMDB(folder, staticAddressesFiles, true, false);
+        File targetDirectory = folder.resolve("lmdb_other_database").toFile();
+        assertThat(targetDirectory.mkdir(), is(true));
+        for (String name : new String[] {"data.mdb", "lock.mdb"}) {
+            Files.copy(new File(sourceDirectory, name).toPath(), new File(targetDirectory, name).toPath());
+        }
+        File targetDataFile = new File(targetDirectory, "data.mdb");
+        long targetBytes = targetDataFile.length();
+
+        CCompactLMDB config = new CCompactLMDB();
+        config.lmdbConfigurationReadOnly.lmdbDirectory = sourceDirectory.getAbsolutePath();
+        config.targetDirectory = targetDirectory.getAbsolutePath();
+
+        assertThrows(RuntimeException.class, () -> new LMDBCompact(config).run());
+        assertThat(targetDataFile.exists(), is(true));
+        assertThat(targetDataFile.length(), is(equalTo(targetBytes)));
+    }
+
+    /** A previous compaction (a lone {@code data.mdb}, no lock file) is still replaced by a new one. */
+    @Test
+    public void compactLMDB_targetHoldsAPreviousCompaction_isReplaced() throws Exception {
+        StaticAddressesFiles staticAddressesFiles = new StaticAddressesFiles();
+        File sourceDirectory = new TestAddressesLMDB().createTestLMDB(folder, staticAddressesFiles, true, false);
+        File targetDirectory = folder.resolve("lmdb_compact_again").toFile();
+
+        CCompactLMDB config = new CCompactLMDB();
+        config.lmdbConfigurationReadOnly.lmdbDirectory = sourceDirectory.getAbsolutePath();
+        config.targetDirectory = targetDirectory.getAbsolutePath();
+        new LMDBCompact(config).run();
+
+        try (LogCaptor logCaptor = LogCaptor.forClass(LMDBCompact.class)) {
+            assertDoesNotThrow(() -> new LMDBCompact(config).run());
+            assertThat(logCaptor.getInfoLogs(), hasItem(containsString("Compaction verified")));
+        }
     }
 }

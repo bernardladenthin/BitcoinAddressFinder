@@ -5,8 +5,13 @@ package net.ladenthin.bitcoinaddressfinder.io;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 import net.ladenthin.bitcoinaddressfinder.CommonDataProvider;
 import net.ladenthin.bitcoinaddressfinder.constants.AddressConstants;
 import net.ladenthin.bitcoinaddressfinder.model.AddressToCoin;
@@ -26,6 +31,7 @@ import org.bouncycastle.util.encoders.Hex;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class AddressTxtLineTest {
 
@@ -39,6 +45,76 @@ public class AddressTxtLineTest {
     }
 
     // <editor-fold defaultstate="collapsed" desc="fromLine">
+    /**
+     * The amount column is only side information, so an amount that is not a non-negative whole
+     * number of satoshi keeps the address and takes the default amount; the listener hears of it so
+     * the import can say how many lines were affected. A negative amount used to be taken over.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"1.5", "abc", "-5", "99999999999999999999", ""})
+    public void fromLine_unusableAmount_takesTheDefaultAndReportsTheLine(String amount) throws Exception {
+        List<String> reported = new ArrayList<>();
+        AddressTxtLine addressTxtLine = new AddressTxtLine(reported::add);
+        String line = P2PKH.values()[0].getPublicAddress() + "," + amount + ",5";
+
+        AddressToCoin addressToCoin = addressTxtLine.fromLine(line, keyUtility);
+
+        assertThat(addressToCoin.coin(), is(equalTo(AddressTxtLine.DEFAULT_COIN)));
+        assertThat(reported, contains(line));
+    }
+
+    /**
+     * A line that is rejected is not an address with an unusable amount: nothing of it is stored, so
+     * the import must not count it as one. A Blockchair export starts with exactly such a header line,
+     * {@code address<TAB>balance}, and every import of one used to report it.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"address\tbalance", "d-1BoatSLRHtKNngkdXEeobR76b53LETtpyT,abc"})
+    public void fromLine_rejectedLineWithTextInTheAmountColumn_isNotReported(String line) {
+        List<String> reported = new ArrayList<>();
+        AddressTxtLine addressTxtLine = new AddressTxtLine(reported::add);
+
+        assertThrows(AddressFormatNotAcceptedException.class, () -> addressTxtLine.fromLine(line, keyUtility));
+
+        assertThat(reported, is(empty()));
+    }
+
+    @Test
+    public void fromLine_validAmountOrNone_isNotReported() throws Exception {
+        List<String> reported = new ArrayList<>();
+        AddressTxtLine addressTxtLine = new AddressTxtLine(reported::add);
+
+        AddressToCoin withAmount = addressTxtLine.fromLine(P2PKH.values()[0].getPublicAddress() + ",42", keyUtility);
+        addressTxtLine.fromLine(P2PKH.values()[0].getPublicAddress(), keyUtility);
+
+        assertThat(withAmount.coin(), is(equalTo(Coin.valueOf(42))));
+        assertThat(reported, is(empty()));
+    }
+
+    /**
+     * The {@code HexHash} export writes one bare hash160 in hex per line. It is read back as that
+     * hash160, whatever its digits and case: a line without a {@code 0} used to fall through to the
+     * Base58 decoder and import a different hash160, and one with a {@code 0} was rejected.
+     */
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "1111111111111111111111111111111111111111",
+                "6623791143505099d01f49706aa85d86839a3fb8",
+                "6623791143505099D01F49706AA85D86839A3FB8",
+                "6623791143505099d01f49706aa85d86839a3fb8,123"
+            })
+    public void fromLine_hexHash160_isImportedAsThatHash160(String line) throws AddressFormatNotAcceptedException {
+        // act
+        AddressToCoin addressToCoin = new AddressTxtLine().fromLine(line, keyUtility);
+
+        // assert
+        String expected = line.split(",")[0].toLowerCase(Locale.ROOT);
+        assertThat(
+                Hex.toHexString(keyUtility.byteBufferUtility().byteBufferToBytes(addressToCoin.hash160())),
+                is(equalTo(expected)));
+    }
+
     @Test
     public void fromLine_addressLineIsEmpty_throwsAddressFormatNotAcceptedException() {
         // act
@@ -87,6 +163,69 @@ public class AddressTxtLineTest {
         // assert
         assertThat(addressToCoin.hash160(), is(equalTo(staticKey.byteBufferPublicKeyUncompressed)));
         assertThatDefaultCoinIsSet(addressToCoin);
+    }
+
+    @Test
+    public void fromLine_addressWithLeadingWhitespace_returnHash160AndAmount()
+            throws AddressFormatNotAcceptedException {
+        // The address column is trimmed, so a line indented by a space or a tab (aligned columns,
+        // hand-edited lists) must parse like the unindented one. Splitting on the whitespace
+        // separators first produced an empty leading token, and the line was rejected as empty.
+        for (String indent : new String[] {" ", "\t", "  "}) {
+            // act
+            AddressToCoin addressToCoin =
+                    new AddressTxtLine().fromLine(indent + staticKey.publicKeyCompressed + ",123", keyUtility);
+
+            // assert
+            assertThat(addressToCoin.hash160(), is(equalTo(staticKey.byteBufferPublicKeyCompressed)));
+            assertThat(addressToCoin.coin(), is(equalTo(Coin.valueOf(123))));
+        }
+    }
+
+    // CashAddr is case-insensitive ("lowercase or uppercase, but not mixed"); QR codes carry it in
+    // uppercase. The spec's example 'bitcoincash:qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a' encodes
+    // the hash160 of 1BpEi6DfDAUFd7GtittLSdBeYJvcoaVggu.
+    private static final String CASH_ADDR_EXAMPLE_HASH160 = "76a04053bda0a88bda5177b86a15c3b29f559873";
+
+    @Test
+    public void fromLine_uppercaseCashAddrWithPrefix_returnsTheHash160OfTheLowercaseForm()
+            throws AddressFormatNotAcceptedException {
+        // act
+        AddressToCoin addressToCoin = assertDoesNotThrow(() ->
+                new AddressTxtLine().fromLine("BITCOINCASH:QPM2QSZNHKS23Z7629MMS6S4CWEF74VCWVY22GDX6A", keyUtility));
+
+        // assert
+        assertThat(
+                Hex.toHexString(keyUtility.byteBufferUtility().byteBufferToBytes(addressToCoin.hash160())),
+                is(equalTo(CASH_ADDR_EXAMPLE_HASH160)));
+    }
+
+    @Test
+    public void fromLine_uppercaseCashAddrWithoutPrefix_returnsTheHash160OfTheLowercaseForm()
+            throws AddressFormatNotAcceptedException {
+        // act
+        AddressToCoin addressToCoin =
+                new AddressTxtLine().fromLine("QPM2QSZNHKS23Z7629MMS6S4CWEF74VCWVY22GDX6A", keyUtility);
+
+        // assert
+        assertThat(
+                Hex.toHexString(keyUtility.byteBufferUtility().byteBufferToBytes(addressToCoin.hash160())),
+                is(equalTo(CASH_ADDR_EXAMPLE_HASH160)));
+    }
+
+    @Test
+    public void fromLine_uppercaseRiecoinScriptPubKey_returnsTheHash160OfTheLowercaseForm()
+            throws AddressFormatNotAcceptedException {
+        // Hex is case-insensitive; an uppercase script used to miss the "76a914" prefix check and
+        // reach the Base58 fallback, which imported a wrong hash160 without a word.
+        // act
+        AddressToCoin addressToCoin =
+                new AddressTxtLine().fromLine("76A914751E76E8199196D454941C45D1B3A323F1433BD688AC", keyUtility);
+
+        // assert
+        assertThat(
+                Hex.toHexString(keyUtility.byteBufferUtility().byteBufferToBytes(addressToCoin.hash160())),
+                is(equalTo("751e76e8199196d454941c45d1b3a323f1433bd6")));
     }
 
     @Test

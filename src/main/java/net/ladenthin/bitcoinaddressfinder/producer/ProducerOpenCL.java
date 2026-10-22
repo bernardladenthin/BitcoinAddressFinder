@@ -5,9 +5,11 @@ package net.ladenthin.bitcoinaddressfinder.producer;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.math.BigInteger;
+import java.util.Locale;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.consumer.Consumer;
@@ -18,6 +20,7 @@ import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLGridResult;
 import net.ladenthin.bitcoinaddressfinder.statistics.RuntimeStatistics;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
+import net.ladenthin.bitcoinaddressfinder.util.PrivateKeyTooLargeException;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -162,6 +165,7 @@ public class ProducerOpenCL extends AbstractProducer {
      * @param keyProducer       the secret supplying strategy
      * @param bitHelper         bit/batch-size helper
      * @param runtimeStatistics shared runtime metrics sink for per-producer batch counts
+     * @throws IllegalArgumentException if {@code producerOpenCL.maxResultReaderThreads} is less than one
      */
     public ProducerOpenCL(
             CProducerOpenCL producerOpenCL,
@@ -171,7 +175,25 @@ public class ProducerOpenCL extends AbstractProducer {
             BitHelper bitHelper,
             RuntimeStatistics runtimeStatistics) {
         this(producerOpenCL, consumer, keyUtility, keyProducer, bitHelper, runtimeStatistics, (ThreadPoolExecutor)
-                Executors.newFixedThreadPool(producerOpenCL.maxResultReaderThreads));
+                Executors.newFixedThreadPool(requireResultReaderThread(producerOpenCL).maxResultReaderThreads));
+    }
+
+    /**
+     * Rejects a {@code maxResultReaderThreads} below one. The field sizes both the result-reader pool
+     * and the semaphore that admits a grid: without the check a {@code 0} failed in
+     * {@code Executors.newFixedThreadPool} with an {@link IllegalArgumentException} that names nothing,
+     * and with an injected pool a semaphore without permits would block the first grid forever.
+     *
+     * @param producerOpenCL the OpenCL producer configuration
+     * @return {@code producerOpenCL}, unchanged
+     * @throws IllegalArgumentException if {@code maxResultReaderThreads} is less than one
+     */
+    private static CProducerOpenCL requireResultReaderThread(CProducerOpenCL producerOpenCL) {
+        if (producerOpenCL.maxResultReaderThreads < 1) {
+            throw new IllegalArgumentException("producerOpenCL.maxResultReaderThreads must be at least 1 but was "
+                    + producerOpenCL.maxResultReaderThreads);
+        }
+        return producerOpenCL;
     }
 
     @Override
@@ -193,6 +215,7 @@ public class ProducerOpenCL extends AbstractProducer {
      * @param bitHelper                       bit/batch-size helper
      * @param runtimeStatistics               shared runtime metrics sink for per-producer batch counts
      * @param resultReaderThreadPoolExecutor  pool used to drain GPU results back to the host
+     * @throws IllegalArgumentException if {@code producerOpenCL.maxResultReaderThreads} is less than one
      */
     @VisibleForTesting
     ProducerOpenCL(
@@ -203,7 +226,13 @@ public class ProducerOpenCL extends AbstractProducer {
             BitHelper bitHelper,
             RuntimeStatistics runtimeStatistics,
             ThreadPoolExecutor resultReaderThreadPoolExecutor) {
-        super(producerOpenCL, consumer, keyUtility, keyProducer, bitHelper, runtimeStatistics);
+        super(
+                requireResultReaderThread(producerOpenCL),
+                consumer,
+                keyUtility,
+                keyProducer,
+                bitHelper,
+                runtimeStatistics);
         this.producerOpenCL = producerOpenCL;
         this.resultReaderThreadPoolExecutor = resultReaderThreadPoolExecutor;
         this.submitSlot = new Semaphore(producerOpenCL.maxResultReaderThreads);
@@ -290,8 +319,49 @@ public class ProducerOpenCL extends AbstractProducer {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             logErrorInProduceKeys(e, secretBase);
+        } catch (PrivateKeyTooLargeException e) {
+            // The last aligned grid below the group order contains n, which the kernel cannot compute
+            // (n·G has no public key, and the batched inversion would spoil its neighbours). Expected
+            // at the end of the key space, so a warning rather than an error; still recorded, so an
+            // orchestrator reading getLastFailure() sees that this grid was not computed.
+            LOGGER.warn(
+                    "Grid at secretBase {} skipped on the GPU: it reaches the group order n. Its keys below n"
+                            + " are not checked by this producer.",
+                    secretBase.toString(16).toUpperCase(Locale.ROOT));
+            recordFailure(e);
         } catch (RuntimeException e) {
             logErrorInProduceKeys(e, secretBase);
+        }
+    }
+
+    /**
+     * Waits until every result reader has put its batch into the consumer. A reader holds one
+     * {@link #submitSlot} permit until it is done, so holding all of them means none is running.
+     * Bounded by {@link #remainingShutdownNanos()}: what is left of {@code shutdownTimeoutSeconds} since
+     * the interrupt, the whole of it when the run ended by itself. A reader still busy at the deadline is
+     * logged, not waited for, so a stuck consumer cannot hold the producer forever -- and the releaser,
+     * whose wait runs to the same deadline, sees the producer stop instead of giving it up a grid earlier.
+     */
+    @Override
+    protected void awaitPendingBatches() {
+        final int permits = producerOpenCL.maxResultReaderThreads;
+        final long waitNanos = remainingShutdownNanos();
+        try {
+            if (submitSlot.tryAcquire(permits, waitNanos, TimeUnit.NANOSECONDS)) {
+                submitSlot.release(permits);
+            } else {
+                LOGGER.error(
+                        "{} of {} result reader(s) still busy after {} ({}, shutdownTimeoutSeconds {}); their batches"
+                                + " may not reach the consumer.",
+                        permits - submitSlot.availablePermits(),
+                        permits,
+                        formatSeconds(waitNanos),
+                        describeTimeSinceInterrupt(),
+                        producerOpenCL.shutdownTimeoutSeconds);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            LOGGER.warn("Interrupted while waiting for the result readers; their batches may not reach the consumer.");
         }
     }
 
@@ -358,6 +428,18 @@ public class ProducerOpenCL extends AbstractProducer {
      */
     int getFreeThreads() {
         return submitSlot.availablePermits();
+    }
+
+    /**
+     * Returns the submit-slot semaphore, so a test can hold a slot with a reader that is stuck in the
+     * consumer -- what a grid's reader does -- without a device: {@link #processSecretBase(BigInteger)}
+     * is the only other way to a held slot, and it needs an initialised OpenCL context.
+     *
+     * @return the semaphore gating the result-reader submissions
+     */
+    @VisibleForTesting
+    Semaphore getSubmitSlot() {
+        return submitSlot;
     }
 
     @Override

@@ -6,6 +6,7 @@ package net.ladenthin.bitcoinaddressfinder.opencl;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.OptionalLong;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import lombok.ToString;
@@ -63,6 +64,12 @@ public class OpenClTask implements ReleaseCLObject {
     private final ClApi clApi;
 
     private final CProducerOpenCL cProducer;
+
+    /** The kernel's {@code CL_KERNEL_WORK_GROUP_SIZE} on the device, an input of {@link OpenClLocalWorkSize#choose}. */
+    private final long kernelWorkGroupSize;
+
+    /** Whether the device is a pocl CPU device, which gets an explicit local work size (see {@link OpenClLocalWorkSize}). */
+    private final boolean poclCpuDevice;
 
     // SourceArgument carries its own ByteBuffer payload — heavy and not useful in logs.
     @ToString.Exclude
@@ -182,15 +189,23 @@ public class OpenClTask implements ReleaseCLObject {
      * @param cProducer         the OpenCL producer configuration
      * @param bitHelper         bit/batch-size helper
      * @param byteBufferUtility byte-buffer helper used for endian conversion
+     * @param kernelWorkGroupSize the kernel's {@code CL_KERNEL_WORK_GROUP_SIZE} on the device
+     * @param poclCpuDevice     whether the device is a pocl CPU device; only then the launch passes an
+     *     explicit local work size (see {@link OpenClLocalWorkSize}), every other device keeps the
+     *     driver's choice
      */
     public OpenClTask(
             ClApi clApi,
             ClContext context,
             CProducerOpenCL cProducer,
             BitHelper bitHelper,
-            ByteBufferUtility byteBufferUtility) {
+            ByteBufferUtility byteBufferUtility,
+            long kernelWorkGroupSize,
+            boolean poclCpuDevice) {
         this.clApi = clApi;
         this.cProducer = cProducer;
+        this.kernelWorkGroupSize = kernelWorkGroupSize;
+        this.poclCpuDevice = poclCpuDevice;
         this.bitHelper = bitHelper;
         this.byteBufferUtility = byteBufferUtility;
         this.privateKeyValidator = new PrivateKeyValidator();
@@ -368,6 +383,10 @@ public class OpenClTask implements ReleaseCLObject {
         }
 
         final long[] globalWorkSize = new long[] {adjustedWorkSize};
+        // Empty on every device but a pocl CPU device, whose default work-group overflows its worker
+        // thread's stack (see OpenClLocalWorkSize).
+        final OptionalLong localWorkSize =
+                OpenClLocalWorkSize.choose(adjustedWorkSize, kernelWorkGroupSize, poclCpuDevice);
 
         // Set the arguments for the kernel
         clApi.setKernelArg(kernel, ARG_DESTINATION, dstMem);
@@ -400,8 +419,10 @@ public class OpenClTask implements ReleaseCLObject {
         {
             // execute the kernel
             final long beforeExecute = System.currentTimeMillis();
-            final @Nullable ClEvent kernelEvent =
-                    clApi.enqueueNDRangeKernel(commandQueue, kernel, globalWorkSize, profiling);
+            final @Nullable ClEvent kernelEvent = localWorkSize.isPresent()
+                    ? clApi.enqueueNDRangeKernel(
+                            commandQueue, kernel, globalWorkSize, new long[] {localWorkSize.getAsLong()}, profiling)
+                    : clApi.enqueueNDRangeKernel(commandQueue, kernel, globalWorkSize, profiling);
             clApi.finish(commandQueue);
             lastKernelExecutionNanos = consumeElapsedNanos(kernelEvent);
 

@@ -1047,17 +1047,30 @@ __kernel void generateKeysKernel_grid(
     // Per walked key: ~5 mul_mod + ~5 sub_mod (slope formula + Montgomery overhead) plus one
     // inv_mod per sub-batch, vs the previous Jacobian add + affine-conversion machinery.
     //
-    // Degenerate case (same practical assumption as the previous path): dx_m == 0 iff m·G == ±P0,
-    // i.e. (baseK0 | base_offset) ≡ ∓m (mod n) — impossible for the supported aligned sequential /
-    // random ranges. If it ever happened, acc becomes 0 in Pass A and the inv_mod zero-guard
-    // returns without hanging; the recovered inverses are then garbage and the filter rejects the
-    // resulting hashes — strictly no worse than the previous path.
+    // Degenerate cases:
+    // - Anchor scalar 0. The first work-item of a grid whose base is 0 gets (baseK0 | base_offset) == 0,
+    //   so P0 would be the point at infinity, which has no affine representation. This is reachable:
+    //   an incremental scan starting at the smallest valid key is aligned down to base 0. Every key of
+    //   that work-item is then m·G, which is exactly iG_table entry m-1, so those keys are taken from
+    //   the table below (anchor_is_zero) and the slope arithmetic of this work-item is discarded. Key 0
+    //   itself is replaced on the host (OpenCLGridResult, INVALID_KEY_ONE).
+    // - dx_m == 0 iff m·G == ±P0, i.e. (baseK0 | base_offset) ≡ ∓m (mod n) for m > 0. The host never
+    //   dispatches a grid that crosses n (OpenClTask rejects such a base), so this is not reached. If it
+    //   were, acc becomes 0 in Pass A and the inv_mod zero-guard returns without hanging; the recovered
+    //   inverses are then garbage and the filter rejects the resulting hashes.
 
     // Affine anchor P0 = (baseK0 | base_offset) * G, computed once with the fixed-base comb.
     u32 x0[ONE_COORDINATE_NUM_WORDS];
     u32 y0[ONE_COORDINATE_NUM_WORDS];
     k_littleEndian_local[0] = (baseK0 | base_offset);
     point_mul_xy_comb(x0, y0, k_littleEndian_local, comb_table);
+
+    // True only for the first work-item of a grid with base 0 (see "Degenerate cases" above).
+    u32 anchor_words = 0;
+    for (int w = 0; w < PRIVATE_KEY_MAX_NUM_WORDS; w++) {
+        anchor_words |= k_littleEndian_local[w];
+    }
+    const bool anchor_is_zero = (anchor_words == 0);
 
 #ifdef USE_REDUCED_RADIX_FIELD
     // Reduced-radix 2^26 walk (inc_ecc_secp256k1_fe10x26.cl): the comb anchor x0/y0 stays radix-2^32
@@ -1218,6 +1231,25 @@ __kernel void generateKeysKernel_grid(
                 sub_mod(y_littleEndian_local, t, y0);                    // y_m = λ(x0 - x_m) - y0
             }
 #endif
+
+            if (anchor_is_zero && m != 0) {
+                // Anchor 0: the key is m·G itself, iG_table entry m-1 (the slope result above is void).
+#ifdef USE_REDUCED_RADIX_FIELD
+                u32 ig_base = (m - 1) * SECP256K1_FE10X26_TWO_COORD_WORDS;
+                u32 zx[SECP256K1_FE10X26_NUM_LIMBS];
+                u32 zy[SECP256K1_FE10X26_NUM_LIMBS];
+                copy_global_u32_array_private_u32(zx, &iG_table[ig_base], SECP256K1_FE10X26_NUM_LIMBS);
+                copy_global_u32_array_private_u32(zy, &iG_table[ig_base + SECP256K1_FE10X26_NUM_LIMBS], SECP256K1_FE10X26_NUM_LIMBS);
+                fe10x26_normalize(zx);
+                fe10x26_to_u32x8(x_littleEndian_local, zx);
+                fe10x26_normalize(zy);
+                fe10x26_to_u32x8(y_littleEndian_local, zy);
+#else
+                u32 ig_base = (m - 1) * TWO_COORDINATE_NUM_WORDS;
+                copy_global_u32_array_private_u32(x_littleEndian_local, &iG_table[ig_base], ONE_COORDINATE_NUM_WORDS);
+                copy_global_u32_array_private_u32(y_littleEndian_local, &iG_table[ig_base + ONE_COORDINATE_NUM_WORDS], ONE_COORDINATE_NUM_WORDS);
+#endif
+            }
 
             u32 loop_index = base_offset + m;
 

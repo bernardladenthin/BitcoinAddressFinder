@@ -107,6 +107,7 @@ using the assigned ID:
   - [Deep Learning Private Key Prediction](#deep-learning-private-key-prediction)
 - [Known Issues](#known-issues)
   - [Hybrid Graphics Performance (Low Throughput)](#hybrid-graphics-performance-low-throughput)
+  - [OpenCL on Linux: signal chaining (`libjsig`)](#opencl-on-linux-signal-chaining-libjsig)
 - [Future Improvements](#future-improvements)
   - [KeyProvider](#keyprovider)
 - [Acknowledgements](#acknowledgements)
@@ -192,7 +193,7 @@ What to look for:
 * **The four build phases run once, at startup** (a few seconds each per 100 M addresses). This is the filter being built from your database — it is normal for the tool to sit here briefly before the first `Statistics` line, with no keys scanned yet.
 * **`ready (… addresses, … fingerprint slots)`** means the filter is built and scanning is about to start.
 * **`Statistics: … [Generated N/s …] [-> LMDB M/s …, NN.NN% pre-filtered] … [Hits: 0]`** is the running heartbeat. `Generated` is the raw key rate; `-> LMDB` is how many candidates survive the GPU pre-filter and reach the database; `pre-filtered` is the share the filter eliminated (so the CPU/LMDB never sees them). `Hits: 0` is expected — a hit means a funded address was actually found.
-* The filter is named after your `gpuFilterType`: the excerpt above is a `FUSE_8` run, whereas the recommended default `FUSE_16` logs `Binary Fuse16 filter: …` and drives the `pre-filtered` share even higher (fewer survivors reach LMDB). See [docs/filter-selection.md](docs/filter-selection.md) for the trade-off.
+* The filter is named after your `gpuFilterType`: the excerpt above is a `FUSE_8` run (the code default), whereas the recommended `FUSE_16` logs `Binary Fuse16 filter: …` and drives the `pre-filtered` share even higher (fewer survivors reach LMDB). See [docs/filter-selection.md](docs/filter-selection.md) for the trade-off.
 
 ### Tune the configuration for your own machine
 
@@ -329,7 +330,7 @@ As of version 1.6.0, the address presence check is decoupled from the on-disk LM
 
 **Most users should just run the shipped example
 [`examples/config_Find_GPU_Fuse16Cascade.json`](examples/config_Find_GPU_Fuse16Cascade.json)** — it
-is already set to the recommended combination. There are two independent knobs, and the defaults are:
+is already set to the recommended combination. There are two independent knobs; the code defaults are `gpuFilterType: FUSE_8` (with `enableGpuFilter: false`) and `addressLookupBackend: LMDB_ONLY`, and the recommendation is:
 
 | Knob | Recommended | Why |
 |---|---|---|
@@ -432,7 +433,7 @@ Supported values:
 
 #### Why `TRUNCATED_LONG_64` is so close to `HASHSET` despite being a binary search
 
-hash160 is the output of SHA-256 followed by RIPEMD-160 and is cryptographically uniform; any subset of its bits is also uniform. `TRUNCATED_LONG_64` keeps only the 8 bytes after the bucket byte (72 bits of total resolution: 8-bit bucket + 64-bit stored value). The probability that a random query collides with one of N stored entries is N/2⁶⁴, which for the largest published database tier is ~7.5 × 10⁻¹¹ per query — rare enough that surfacing such a collision as an unverified hit is harmless (LMDB is closed after population, like `HASHSET`). Unlike the Binary Fuse backends, whose 0.4%/0.0015% FPR is far too high to leave unverified, `TRUNCATED_LONG_64` needs no LMDB verifier. In return:
+hash160 is the output of SHA-256 followed by RIPEMD-160 and is cryptographically uniform; any subset of its bits is also uniform. `TRUNCATED_LONG_64` keeps only the 8 bytes after the bucket byte (72 bits of total resolution: 8-bit bucket + 64-bit stored value). The probability that a random query collides with one of N stored entries is N/2⁷², which for the largest published database tier is ~3 × 10⁻¹³ per query (each key is queried twice, compressed and uncompressed: ~0.6 spurious hits per 10¹² keys at 1.4 billion entries) — rare enough that surfacing such a collision as an unverified hit is harmless (LMDB is closed after population, like `HASHSET`). Unlike the Binary Fuse backends, whose 0.4%/0.0015% FPR is far too high to leave unverified, `TRUNCATED_LONG_64` needs no LMDB verifier. In return:
 
 - **Cache-line dense**: 8 longs per 64-byte cache line, the binary search walks very little memory.
 - **JDK intrinsic**: `Arrays.binarySearch(long[], long)` is heavily JIT-optimised and produces branchless comparisons on modern CPUs.
@@ -795,6 +796,9 @@ In addition to standard script types, the importer also recognizes and supports 
 * **Riecoin P2SH as ScriptPubKey**  
   Riecoin P2SH addresses are provided as raw ScriptPubKey hex (starting with `76a914...`).
 
+* **Bare hash160 in hex**  
+  A line of exactly 40 hex characters (case-insensitive), optionally followed by a separator and an amount, is read as the hash160 itself. This is the line format of the `HexHash` export, so an exported file can be imported again.
+
 ---
 
 > **Legend:**  
@@ -965,7 +969,8 @@ parser threads is enough to keep it fed.
 copy with the `CompactLMDB` command (LMDB `MDB_CP_COMPACT`; see
 [`examples/config_CompactLMDB.json`](examples/config_CompactLMDB.json)). It opens the source
 read-only, writes `data.mdb` into a separate target directory, and verifies the copy's entry count
-against the source. The read benefit is largest when the database exceeds RAM (a smaller file raises
+against the source. The target directory must be empty or hold only an earlier compaction, which is
+replaced; any other file there (another database's `lock.mdb`, say) stops the run before anything is deleted. The read benefit is largest when the database exceeds RAM (a smaller file raises
 the OS page-cache hit rate); for a database that fits in RAM the gain is marginal.
 
 **Optional — extract what a newer database adds over a reference.** The `LMDBDelta` command
@@ -984,7 +989,7 @@ though a hash that originally came from a P2SH/bech32/altcoin address is written
 The exporter provides various output formats for Bitcoin and altcoin address data:
 
 * **HexHash**  
-  Exports addresses as raw `hash160` (RIPEMD-160 of the SHA-256 of the public key), encoded in hexadecimal. No version byte or checksum is included. Ideal for advanced usage and low-level comparison. Best viewed in fixed-width hex viewers (e.g., HxD).
+  Exports addresses as raw `hash160` (RIPEMD-160 of the SHA-256 of the public key), encoded in hexadecimal. No version byte or checksum is included. Ideal for advanced usage and low-level comparison. Best viewed in fixed-width hex viewers (e.g., HxD). The import reads such lines back (see "Bare hash160 in hex" under the import formats); the origin of a hash (P2PKH, P2SH, P2WPKH) and its amount are not part of this format.
 
 * **FixedWidthBase58BitcoinAddress**  
   Exports Base58Check-encoded addresses (e.g., legacy `P2PKH`) in a fixed-width format for consistent alignment. No amount is included. Suitable for hex/byte-aligned visual inspection and batch comparison.
@@ -1299,16 +1304,21 @@ This mode generates private keys **sequentially in batches** within a specified 
 | JSON field     | Type   | Default                                                                                    | Purpose                                                      |
 |----------------|--------|--------------------------------------------------------------------------------------------|--------------------------------------------------------------|
 | `startPrivateKey` | string | `0000000000000000000000000000000000000000000000000000000000000002`                         | Hex string of the first private key in the range (inclusive) |
-| `endPrivateKey`   | string | `FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141` (secp256k1 group order) | Hex string of the last private key in the range (inclusive)  |
+| `endPrivateKey`   | string | `FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364140` (n − 1, the last valid key; n is the secp256k1 group order) | Hex string of the last private key in the range (inclusive)  |
 
 #### How it works
 - Scanning begins **at `startPrivateKey`**, producing sequential private keys in batches of `2^batchSizeInBits` keys each, up to and including `endPrivateKey`. See [Batch Size per Kernel (`batchSizeInBits`)](#-batch-size-per-kernel-batchsizeinbits) above for the exponent &#x2192; batch-size mapping and typical values.
-- Each batch contains exactly `2^batchSizeInBits` keys.
-- If the next full batch would go **beyond `endPrivateKey`**, the process stops with an **exception**.
-- The **`endPrivateKey` is inclusive**, but **partial batches are not allowed by default** &#x2014; batches must fit completely inside the range.
-- For optimal performance, especially with OpenCL, configure `batchSizeInBits` (and the matching `keysPerWorkItem`) so that batches align perfectly within the range. This prevents errors and maximizes throughput.
-
-> **Note:** If unsure, set the `endPrivateKey` slightly higher to match a `2^batchSizeInBits` multiple. This helps avoid exceptions and ensures efficient scanning.
+- The **`endPrivateKey` is inclusive**, and no key of the range is left out:
+  - **Grid mode** (`batchUsePrivateKeyIncrement: true`, the default, and the only mode of `producerOpenCL`): every
+    batch is a grid of `2^batchSizeInBits` keys whose base is aligned down to a multiple of `2^batchSizeInBits`.
+    The first grid can therefore start below `startPrivateKey` and the last one end above `endPrivateKey`; those
+    extra keys are checked too. One exception at the very top of the key space: the GPU does not compute the
+    last grid below the group order n, because it reaches past n (it is skipped with one logged warning). Those are
+    the last `((n − 1) mod 2^batchSizeInBits) + 1` keys; the CPU grid checks them.
+  - **Explicit keys** (`batchUsePrivateKeyIncrement: false`, CPU only): batches of `2^batchSizeInBits` sequential
+    keys; when the range ends inside a batch, the last batch is the shorter rest up to and including `endPrivateKey`.
+- For optimal performance, especially with OpenCL, configure `batchSizeInBits` (and the matching `keysPerWorkItem`)
+  so that the range is a whole number of grids; otherwise the first and last grid check keys outside it.
 
 ---
 
@@ -1322,7 +1332,7 @@ Example minimal configuration:
     {
       "keyProducerId": "exampleKeyProducerId",
       "startPrivateKey": "0000000000000000000000000000000000000000000000000000000000000002",
-      "endPrivateKey": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141"
+      "endPrivateKey": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364140"
     }
   ]
 }
@@ -1353,12 +1363,12 @@ Useful for piping externally generated secrets (e.g., from Python, Go, etc.) dir
 | `keyProducerId`               | string                           | —             | Unique identifier for this key producer                                             |
 | `mode`                        | string enum (`CLIENT`, `SERVER`) | `"SERVER"`    | Whether to connect to a remote socket (`CLIENT`) or wait for connections (`SERVER`) |
 | `host`                        | string                           | `"localhost"` | Remote host to connect to (used only in `CLIENT` mode)                              |
-| `port`                        | number                           | `12345`       | TCP port to connect to or bind on                                                   |
-| `timeoutMillis`               | number                           | `3000`        | Socket timeout in milliseconds, applied to accept (server), connect (client) and per-read. Must be non-negative |
+| `port`                        | number                           | `12345`       | TCP port to connect to or bind on; in `SERVER` mode a port that cannot be bound (e.g. already in use) fails the start |
+| `timeoutMillis`               | number                           | `3000`        | Timeout in milliseconds, applied to accept (server), connect (client), per-read and to how long `createSecrets()` waits for a queued secret. Must be non-negative. A wait that times out before the first secret of a batch ends the producer; one that times out after some secrets returns those as a shorter batch, which is checked |
 | `logReceivedSecret`           | boolean                          | `false`       | Whether to log each received private key as a hex string                            |
 | `connectRetryCount`           | number                           | `5`           | Number of times to retry establishing a socket connection (client mode)             |
 | `broadcastResults`            | boolean                          | `false`       | Serve the outcome of every checked batch on `resultPort` (see below)                |
-| `resultPort`                  | number                           | `5556`        | TCP port the result server binds to, used only when `broadcastResults` is set       |
+| `resultPort`                  | number                           | `5556`        | TCP port the result server binds to, used only when `broadcastResults` is set; must differ from `port` in server mode, and in client mode when `host` is this machine, where the producer would read its own result server's lines as secrets (the start is refused in both cases), and a port that cannot be bound (e.g. already in use) fails the start |
 | `connectRetryDelayMillis`     | number                           | `1000`        | Delay between connection retry attempts (in milliseconds)                           |
 | `maxWorkSize`                 | number                           | `16777216`    | Maximum number of secrets to request in a single call                               |
 
@@ -1438,7 +1448,7 @@ Ideal for decoupled key streaming where producers push keys using ZeroMQ `PUSH` 
 | keyProducerId      | string                       | —                      | Unique identifier for this key producer     |
 | address            | string                       | tcp://localhost:5555   | The ZeroMQ address to bind or connect to    |
 | mode               | string enum (BIND, CONNECT)  | BIND                   | Whether this socket binds to or connects    |
-| timeoutMillis      | number                       | `-1`                   | Receive timeout in milliseconds:<br> `0` = non-blocking,<br> `-1` = infinite,<br> `>0` = wait that long |
+| timeoutMillis      | number                       | `1000`                 | Receive timeout in milliseconds, for the socket and for `createSecrets()`:<br> `0` = non-blocking,<br> `-1` = infinite,<br> `>0` = wait that long.<br> A timeout before the first secret of a batch ends the producer; one after some secrets returns those as a shorter batch, which is checked |
 | logReceivedSecret  | boolean                      | false                  | Whether to log each received secret in hex  |
 | broadcastResults   | boolean                      | false                  | Publish the outcome of every checked batch (see below) |
 | publishAddress     | string                       | tcp://127.0.0.1:5558   | Address the result `PUB` socket binds to, used only when `broadcastResults` is set |
@@ -1480,8 +1490,8 @@ open `examples/websocket_scanner.html` in a browser.
 | JSON field         | Type    | Default | Description                                                        |
 |--------------------|---------|---------|--------------------------------------------------------------------|
 | keyProducerId      | string  | —       | Unique identifier for this key producer                             |
-| port               | number  | `8080`  | TCP port the WebSocket server binds to                              |
-| timeoutMillis      | number  | `1000`  | How long `createSecrets()` waits for a queued secret:<br> `-1` = block forever, `0` = return immediately, `>0` = wait that long |
+| port               | number  | `8080`  | TCP port the WebSocket server binds to; a port that cannot be bound (e.g. already in use) fails the start |
+| timeoutMillis      | number  | `1000`  | How long `createSecrets()` waits for a queued secret:<br> `-1` = block forever, `0` = return immediately, `>0` = wait that long.<br> A timeout before the first secret of a batch ends the producer; one after some secrets returns those as a shorter batch, which is checked |
 | logReceivedSecret  | boolean | `false` | Whether to log each received secret in hex                          |
 | broadcastResults   | boolean | `false` | Send the outcome of every checked batch back on this same port      |
 
@@ -1586,7 +1596,9 @@ while True:
 * Each private key must be exactly 32 raw bytes, sent as a single ZeroMQ message.
 * Messages are interpreted as unsigned big-endian (`new BigInteger(1, bytes)` in Java).
 * No framing or delimiters needed—ZeroMQ handles message boundaries.
-* Messages larger or smaller than 32 bytes will be discarded or raise errors.
+* A message larger or smaller than 32 bytes is rejected: after valid secrets of the same batch it ends
+  the batch early (the valid secrets are checked, the invalid one is logged as a warning in hex and
+  dropped, later messages stay queued); as the first secret of a batch it ends the producer.
 
 
 #### 📄 Secrets File Producer (`producerJavaSecretsFiles`)
@@ -1598,7 +1610,7 @@ format is selected with `secretFormat`. See [`config_Find_SecretsFile.json`](exa
 
 | JSON field      | Type                  | Default          | Description                                              |
 |-----------------|-----------------------|------------------|----------------------------------------------------------|
-| `keyProducerId` | string                | —                | Unique identifier for this producer                      |
+| `keyProducerId` | string                | —                | Id of a configured key producer (required like for every producer, although this one reads its secrets from the files) |
 | `secretsFiles`  | array of string       | `[]`             | Paths of the files to read (relative to the working dir) |
 | `secretFormat`  | string enum           | `STRING_SHA256`  | Line format of every file (see below)                    |
 
@@ -1613,6 +1625,9 @@ Supported `secretFormat` values:
 
 ```jsonc
 // ...
+"keyProducerJavaRandom": [
+    { "keyProducerId": "exampleKeyProducerId", "randomAlgorithm": "SECURE_RANDOM" }
+],
 "producerJavaSecretsFiles": [
     {
         "keyProducerId": "exampleKeyProducerId",
@@ -1653,6 +1668,8 @@ The CPU then hashes the X and Y coordinates of the public keys to derive the cor
 #### PoCL (Portable Computing Language) support
 
 The OpenCL code is compatible with and tested against [PoCL](https://github.com/pocl/pocl), an open-source, portable OpenCL implementation. PoCL lets you run the kernels without a vendor GPU driver and exposes a range of **specialized targets** (backends) that PoCL supports — for example CPU (host), CUDA, and other device backends — so you can pick the device that best fits your hardware. Select the desired PoCL device through the usual `producerOpenCL` `platformIndex` / `deviceIndex` settings (use the `OpenCLInfo` command to list the platforms and devices PoCL exposes).
+
+**Work-group limit on PoCL's CPU device.** Left to itself, PoCL's CPU device runs the key kernel in work-groups of its maximum size (4096), and the kernel then overflows the 8 MB stack of PoCL's worker thread: the JVM dies with `SIGSEGV` (exit code 139 or 134). The finder therefore launches every kernel on a PoCL CPU device (detected by the platform name `Portable Computing Language` or `PoCL` in `CL_DEVICE_VERSION`, not by the vendor string, which names the CPU) with an explicit local work size of at most 256 (and at most the kernel's own `CL_KERNEL_WORK_GROUP_SIZE`) and logs that at start-up: the key kernel, the table precompute kernels and the benchmark hooks; every other device keeps the driver's choice. The `run_*OpenCL*.sh` launchers and `run_TuneConfiguration.sh` also export `POCL_MAX_WORK_GROUP_SIZE=256` (unless it is set already); the finder does not need it, and a value set there lowers the limit the finder reads from PoCL. On Linux, also preload `libjsig` (see [OpenCL on Linux: signal chaining](#opencl-on-linux-signal-chaining-libjsig)).
 
 #### Built-in Self-Test (BIST)
 
@@ -1876,7 +1893,7 @@ are fully configurable (see [Customizing Log Output](#customizing-log-output)).
 A statistics line looks like this:
 
 ```
-Statistics: [uptime 43 min] [Generated 128.0 M/s (333258 M total)] [-> LMDB 2.000 M/s (5196 M lookups total), 99.22% pre-filtered] [rate window 60s] [Keys per producer: exampleKeyProducerSecureRandomId (Random, GPU)=333.3 G (100.0%)] [Producers running: 1] [Consumers running: 8] [Consumer ready for work (queue empty): 167939] [Producer blocked (queue full): 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]
+Statistics: [uptime 43 min] [Generated 128.0 M/s (333258 M total)] [-> LMDB 2.000 M/s (5196 M lookups total), 99.22% pre-filtered] [rate window 60s] [Keys per producer: exampleKeyProducerSecureRandomId (Random, GPU)=333.3 G (100.0%)] [Producers running: 1] [Consumers running: 8] [Consumer ready for work (queue empty): 167939] [Producer blocked (queue full): 0] [Average contains time: 3850 ns] [keys queue size: 0] [Hits: 0]
 ```
 
 | Field | Meaning |
@@ -1890,7 +1907,7 @@ Statistics: [uptime 43 min] [Generated 128.0 M/s (333258 M total)] [-> LMDB 2.00
 | `Consumers running: N` | Number of consumer worker threads currently running (≤ `consumerJava.threads`). |
 | `Consumer ready for work (queue empty): N` | **Runtime health counter — rising is normal/healthy.** Consume cycles that found the queue empty and waited. An empty queue is the *desired* state: it means the CPU drains everything the producers generate and has headroom. See below. |
 | `Producer blocked (queue full): N` | **Runtime health counter — rising is the warning sign.** Times a producer hit a full queue and had to wait, i.e. the CPU can't keep up (CPU-bound). See below. |
-| `Average contains time: N ms` | Mean time spent per address-presence lookup. Large values point at a slow lookup backend (see [Address Lookup Backends](#-pluggable-address-lookup-backends-addresslookupbackend)). |
+| `Average contains time: N ns` | Mean time spent per address-presence lookup. Large values point at a slow lookup backend (see [Address Lookup Backends](#-pluggable-address-lookup-backends-addresslookupbackend)). |
 | `keys queue size: N` | Instantaneous depth of the producer→consumer queue (bounded by `consumerJava.queueSize`). |
 | `Hits: N` | Number of address matches found so far (see [Hit Logging](#hit-logging)). |
 
@@ -2178,6 +2195,73 @@ Laptops with hybrid graphics—using both integrated (iGPU) and discrete (dGPU) 
 | **Apple (Intel)**  | MacBook Pro (pre-2021 with dual GPUs)            | macOS → Disable *Automatic Graphics Switching* in Energy Preferences |
 
 > If your laptop uses hybrid graphics, always ensure that the **discrete GPU** is explicitly selected for OpenCL workloads to avoid severe performance bottlenecks.
+
+### OpenCL on Linux: signal chaining (`libjsig`)
+
+An OpenCL driver that compiles kernels inside the Java process with LLVM can take over the JVM's
+`SIGSEGV`, `SIGBUS`, `SIGFPE` and `SIGILL` handlers. Measured with **pocl 5.0** (the CPU OpenCL
+device, also used in CI): its `libLLVM-16.so.1` installs its own handlers while the kernel is built.
+HotSpot raises `SIGSEGV` on purpose (implicit null checks, safepoint polls), so when several threads
+fault at once — at a safepoint, typically while the finder shuts down — the JVM can die with
+`Segmentation fault` (exit code 139) and **without** an `hs_err` file.
+
+Measured per driver (`-Xcheck:jni` after the kernel build, plus a probe of 8 hot threads and 2000
+forced safepoints):
+
+| Driver | Replaces the JVM's handlers | Probe crashes without `libjsig` |
+|---|---|---|
+| pocl 5.0 (CPU, `libLLVM-16.so.1`) | yes — `SIGSEGV`, `SIGBUS`, `SIGFPE`, `SIGILL`, also `SIGUSR2` (the JVM's thread suspend/resume) and `SIGTERM`/`SIGINT`/`SIGHUP`/`SIGQUIT`/`SIGTRAP` | 5 of 5 |
+| AMD ROCm 7.14 (Instinct MI325X, CDNA3, `libLLVM.so.23.0git`) | yes — the same set | 0 of 5 |
+| AMD ROCm 10.1 (Radeon PRO V710, RDNA3 `gfx1101`, `libLLVM.so.24.0git`) | yes — the same set | 0 of 5 |
+| Intel CPU runtime 2026.2 (`intel-oneapi-runtime-opencl`, `libintelocl.so`) | yes — the same set, already when the context is created | 5 of 5 |
+| NVIDIA 580.126.18 (RTX 3080) | no | 0 of 5 |
+| Intel GPU (compute-runtime/NEO) | not measured (no Intel GPU was reachable) | — |
+
+What else changes without `libjsig`, measured per driver:
+
+- **pocl:** `kill -3` no longer prints a thread dump; Ctrl-C/`SIGTERM`/`SIGHUP` still run the shutdown
+  hooks, `jcmd` and JFR sampling still work.
+- **Intel CPU runtime:** like pocl for the hooks, `jcmd` and JFR, and the probe crashes 5 of 5; `kill -3`
+  still dumps, but Intel's LLVM handler first prints a spurious "PLEASE submit a bug report" line.
+- **AMD ROCm** (both generations above): no observable consequence — the hooks run, `kill -3` dumps,
+  `jcmd` and JFR work, the probe survives. The handlers are replaced all the same (`-Xcheck:jni` reports
+  them), and the probe exercises one failure path only, so `libjsig` is recommended here as well.
+- **Intel GPU:** unmeasured. Its kernel compiler (`libigc`) is LLVM-based as well, so the safe default
+  is `libjsig` until it is measured.
+
+The JDK ships the fix: preload its signal-chaining library, which keeps the JVM's handlers in front and
+forwards to the driver's:
+
+```bash
+# the libjsig of the JDK whose java runs (does not depend on JAVA_HOME being set)
+JSIG="$(dirname "$(dirname "$(readlink -f "$(command -v java)")")")/lib/libjsig.so"
+LD_PRELOAD="$JSIG" java ... -jar bitcoinaddressfinder-<version>-jar-with-dependencies.jar config.json
+```
+
+A path that does not exist is not an error for the dynamic linker: it prints `ERROR: ld.so: object
+'...' from LD_PRELOAD cannot be preloaded ...: ignored.` and starts the JVM without signal chaining
+(`"$JAVA_HOME/lib/libjsig.so"` with `JAVA_HOME` unset is `/lib/libjsig.so`). The finder therefore
+checks what is actually loaded (`/proc/self/maps`), not the `LD_PRELOAD` string, and warns in that
+case as well.
+
+The launchers in `examples/` that start an OpenCL run (`run_*OpenCL*.sh` and `run_TuneConfiguration.sh`)
+do this already, and the finder logs a warning, once per JVM, when it builds an OpenCL kernel on Linux
+without it, whatever the driver. Windows is not affected.
+
+**pocl only: the work-group size.** Without a local work size, pocl picks its maximum group (4096
+on 4- and 16-core hosts), and the key-generation kernel overflows the 8 MB stack of pocl's worker
+thread: the JVM dies with exit code 139 or 134 (measured 5 of 5 times without a limit, never with 256).
+The finder therefore passes a local work size of at most 256 for every kernel it launches on a pocl
+CPU device -- the key kernel, the table precompute kernels and the benchmark hooks (see
+[PoCL support](#pocl-portable-computing-language-support)). The launchers and the CI job
+`test-opencl` additionally set
+
+```bash
+export POCL_MAX_WORK_GROUP_SIZE=256
+```
+
+The finder does not need it; in CI it also caps the few kernels test classes launch directly through
+the OpenCL binding, without a local size. GPU drivers are not affected by this.
 
 ### Contributors: do not upgrade jqwik past 1.9.3
 

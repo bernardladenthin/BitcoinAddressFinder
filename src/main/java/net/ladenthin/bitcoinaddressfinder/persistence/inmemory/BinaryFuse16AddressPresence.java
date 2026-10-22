@@ -48,7 +48,7 @@ import org.slf4j.LoggerFactory;
  * Once populated this class holds no reference to its source. As a bare filter it owns no
  * delegate, so {@link #requiresBackend()} returns {@code false}; in production it is wrapped by
  * {@link BinaryFuseAccelerator}, whose {@code requiresBackend()} returns {@code true} to keep
- * the LMDB verifier open. Unlike the exact snapshots ({@code HASHSET}, {@code TRUNCATED_LONG_64})
+ * the LMDB verifier open. Unlike the self-contained snapshots ({@code HASHSET}, {@code TRUNCATED_LONG_64})
  * the LMDB env is therefore <em>not</em> released after population.
  *
  * <h2>Concurrency</h2>

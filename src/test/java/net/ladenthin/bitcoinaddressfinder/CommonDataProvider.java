@@ -724,6 +724,28 @@ public class CommonDataProvider {
     }
 
     /**
+     * For {@link #privateKeysTooLargeForASmallGrid()}.
+     */
+    public static final String DATA_PROVIDER_PRIVATE_KEYS_TOO_LARGE_FOR_A_SMALL_GRID =
+            CLASS_NAME + "#privateKeysTooLargeForASmallGrid";
+
+    /**
+     * The keys of {@link #privateKeysTooLargeWithChunkSize()} on a grid of 2^8 keys.
+     *
+     * <p>For tests that need a real OpenCL context: a 2^24 grid allocates more than
+     * {@code CL_DEVICE_MAX_MEM_ALLOC_SIZE} on a device with 1024 MiB per allocation (pocl on a 15 GB
+     * host), and {@code clCreateBuffer} then fails before the key is ever checked. The keys are too
+     * large on any grid, so the rejection under test does not depend on its size.
+     *
+     * @return the keys with a grid size of 8 bits
+     */
+    public static Object[][] privateKeysTooLargeForASmallGrid() {
+        return new Object[][] {
+            {PublicKeyBytes.MAX_TECHNICALLY_PRIVATE_KEY, 8}, {Secp256k1Constants.MAX_PRIVATE_KEY, 8},
+        };
+    }
+
+    /**
      * For {@link #privateKeys32ByteRequiringStrip()}.
      */
     public static final String DATA_PROVIDER_PRIVATE_KEYS_32_BYTE_REQUIRING_STRIP =

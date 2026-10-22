@@ -11,6 +11,44 @@ so everything below is genuinely still open.
 
 ## Open — BAF-specific
 
+### Open points from the bug hunt of 2026-10-16 … 20 (details: `BUGHUNT-FOUND.md`)
+
+Everything the bug hunt left open, so nothing is lost when the session ends. The ledger entry
+named in each item holds the analysis, the history and the reproduction; delete an item here when
+it is done, as for every other item in this file.
+
+**Decided by the owner, recorded** (no change, kept so the reasoning is not lost):
+
+- **Grid mode on the GPU, top of the key space — decided 2026-10-19: no change.** The last aligned
+  grid `alignDown(n−1)` always contains n (for `batchSizeInBits` ≥ 2). `OpenClTask.setSrcPrivateKeyChunk`
+  rejects it, `ProducerOpenCL.processSecretBase` logs that once (a warning since F171), the producer goes on, and
+  an incremental scan ends after it as usual: that grid never reaches OpenCL, so the GPU never computes
+  past n. The owner's reasoning: the region is a few keys right at the bound, irrelevant for scanning,
+  and computing it would cost every grid a check in the kernel. The lower bound needs nothing either:
+  key 0 occurs once (grid base 0) and is handled since F129 (kernel) and by `INVALID_KEY_ONE` (host).
+  For the record, a pocl probe of computing that grid anyway: every key below n correct except n−1,
+  which the batched inversion (`KEYS_BATCH_INV` 16) poisons together with n unless it is a work-item
+  anchor; the CPU grid handles the same grid correctly (F45). Grid mode at the ends of a range is fine
+  as it is: the base is aligned down, so the grids reach past `startPrivateKey`/`endPrivateKey`, and
+  those are real keys that are checked. Re-examined 2026-10-19 (owner: "cap the grid once before it
+  starts instead?"): not possible without a kernel change. The kernel derives a work item's key as
+  `k[0] = baseK0 | base_offset`, a bitwise OR into the lowest word, which is only correct for an
+  aligned base; a top grid capped to `n − 2^bits` is unaligned and would yield wrong keys. Computing
+  the grid and discarding the keys past n fails too (the batched inversion above). The one host check
+  per grid in `setSrcPrivateKeyChunk` is already the "guard once before the grid". Since F171 it
+  has a second half, the kernel's precondition: `OpenCLContext.createKeys` refuses an unaligned base
+  before the kernel runs, and the skipped top grid is one WARN instead of an ERROR with a stack trace.
+
+**Still open (review of PR #395, 2026-10-22):**
+
+- **`TuneConfiguration` and the shutdown hook's wait.** Since F273 the hook's wait for a `Find` run
+  covers the consumer's queue drain (`awaitQueueEmptySeconds`, 60 s by default) plus the broadcaster
+  close bounds plus the 30 s margin. The tuner's `finally` runs the same drain (60 s in
+  `examples/config_TuneConfiguration.json`) while the hook still waits the 30 s margin alone for that
+  command. Nothing promised is lost there -- the tuner's lookup is `NEVER_PRESENT` and it broadcasts no
+  result -- so a halt mid-drain only cuts the tuner's own cleanup short. Give `TuneConfiguration` the same
+  budget if its cleanup ever matters (a `Finder.shutdownBudgetSeconds`-like reading of its consumer).
+
 ### Persistence backends (genuinely open work)
 
 Implementation of `BLOOM` / `HASHSET` / `TRUNCATED_LONG_64` /
@@ -275,11 +313,12 @@ This means the Part 2 GPU-side filter and the compact-output-buffer approach app
   - **What needs to be designed first** (before any kernel changes): the canonical reference of `HeapByteBuffer.hashCode()` semantics that the JMH guard will pin against (capture the bytecode of `java.nio.HeapByteBuffer#hashCode` for the running JDK and assert it matches a known-good copy at build time, so a JDK upgrade can't silently corrupt the GPU formula); whether `ConsumerJava` carries the precomputed hash through `AbstractProducer`/`AbstractKeyProducerQueueBuffered` as a parallel `int[]`/`IntBuffer` next to the existing hash160 buffers, or extends the per-candidate result struct in place; whether the `HashSet_PrecomputedHash` map should fall back to JDK `HashSet<ByteBuffer>` semantics on CPU-only paths (e.g. `ProducerJava` producers that don't go through OpenCL) by computing the same hash on the CPU side using the same reference formula — yes, for consistency across producers.
 
 - **GPU-side no-false-negatives address filter with per-variant flag bitmask.** Today the GPU kernel returns raw hash160 bytes for every candidate key and the CPU calls `lookup.containsAddress(...)` twice per candidate (once for the uncompressed address, once for compressed). For large workgroup sizes this serialises the most expensive part of the pipeline on a single CPU thread. The goal is to move the address-presence filter onto the GPU so that the CPU only receives — and only queries LMDB for — the tiny subset of candidates that the GPU marked as "possibly found". The filter must satisfy the **no-false-negatives invariant**: if an address IS in the database, the GPU must always set its flag bit. False positives are acceptable — the CPU verifies any flagged candidate against LMDB and discards false positives there. This is exactly the bloom-filter contract: zero false negatives, bounded false positives.
+  - **Status: superseded in its core, keep only as a design record.** What shipped is not this design: the kernel probes a **Binary Fuse** filter (`FUSE_8` or `FUSE_16`, `producerOpenCL.gpuFilterType`; key = the first 8 bytes of the hash160) and, in compact mode (`enableGpuFilter: true`, `transferAll: false`), emits only the survivors; the host builds the filter once from LMDB in `ConsumerJava.initLMDB()` and uploads it once per session (Fuse-8 kernel `62f831d`, Fuse-16 kernel `2bb0a0b`, decoupled from the CPU backend in `5323c04`). The `TRUNCATED_LONG_64` snapshot was never uploaded to the GPU, and the per-variant flags byte below was not built either (the kernel ORs the two lookups). The open GPU-filter work is the tuner gap under "`TuneConfiguration` sweeps under `FUSE_8` and recommends `FUSE_16` with the `FUSE_8` winner arm" below.
   - **Upload the snapshot once at startup.** Right after `TruncatedLong64SortedArrayPresence.populateFrom(lmdb)` builds the 256 sorted `long[]` buckets in host RAM, copy each bucket into device global memory (`cl_mem` buffer per bucket, plus a small offset/length index). At ~8 B/entry this fits comfortably in modern GPU VRAM for any practical database size (~1.1 GB for the Light DB, ~11 GB for the Full DB; the latter may need streaming on smaller cards).
-  - **Filter semantics and VRAM trade-offs.** The TRUNCATED_LONG_64 snapshot (sorted 64-bit truncated values, binary search per work-item) gives a near-zero false-positive rate (~7.5 × 10⁻¹¹ per query for the Full DB) and satisfies no-FN by construction — no entry is ever omitted. This is stronger than the filter contract strictly requires. For VRAM-constrained GPUs (8 GB cards with Full DB), alternative probabilistic structures use less memory at the cost of a higher but still acceptable FP rate:
+  - **Filter semantics and VRAM trade-offs.** The TRUNCATED_LONG_64 snapshot (sorted 64-bit truncated values, binary search per work-item) gives a near-zero false-positive rate (N/2⁷², ~3 × 10⁻¹³ per query for the Full DB) and satisfies no-FN by construction — no entry is ever omitted. This is stronger than the filter contract strictly requires. For VRAM-constrained GPUs (8 GB cards with Full DB), alternative probabilistic structures use less memory at the cost of a higher but still acceptable FP rate:
     - **Bloom filter on GPU**: hash160 is already a strong 160-bit uniform hash, so different bit-window slices of the hash160 serve directly as the k independent probe positions — no separate hash computation. For 132 M entries (Light DB) a 512 MB filter gives ~32 bits/element and FP ≈ 10⁻⁹; for 1.4 B entries (Full DB) the same 512 MB gives ~3 bits/element and FP ≈ 10 % — unacceptable, requiring ~4–8 GB for a useful FP rate. GPU bloom filters are well-studied; the access pattern (k random bit reads) suits global memory with reasonable L2 hit rates for small-to-medium filters.
     - **Binary Fuse filter (XOR filter family)**: uses ~1.23 × log₂(1/ε) bits/element (vs ~1.44 for bloom). Lookup is 3 array accesses + XOR of 8-bit or 16-bit fingerprints derived from the hash160. For 132 M entries at FP ≈ 10⁻⁹: ~370 MB. For 1.4 B entries at the same rate: ~3.9 GB. Construction is offline (once, before upload); GPU-side lookup is simple and branch-free. Worth evaluating if VRAM is tight.
-    - **Recommendation**: use TRUNCATED_LONG_64 (already implemented CPU-side) for the first GPU implementation. Switch to a binary fuse filter only if VRAM headroom on the target GPU makes TRUNCATED_LONG_64 impractical for the DB size in use.
+    - **Decision (taken differently)**: the first GPU implementation used a Binary Fuse filter instead of TRUNCATED_LONG_64 — ~1.1–2.3 B/entry instead of 8, so the Full DB fits an 8 GB card, with 3 reads instead of a binary search; the false positives are verified on the CPU. See `GpuFilterType` and `docs/filter-selection.md`.
   - **Output a flags byte, not raw hashes.** The kernel's per-work-item result struct gains a `uint8_t flags` field. The GPU runs the filter lookup **twice** — once for the uncompressed hash160 and once for the compressed hash160 — and encodes both results into separate bits:
     ```
     bit 0 (0x01): uncompressed hash160 lookup positive — no false negatives guaranteed
@@ -559,15 +598,59 @@ Also correct `docs/performance.md`: its "≈255 registers with spilling" reading
 `kernelMaxWorkGroupSize = 256` is wrong — the driver's PTX assembles to 126–128 registers with no
 spill, and the 256 cap stays even at `-cl-nv-maxrregcount=96`.
 
+### GPU OpenCL drivers and the JVM's signal handlers: what replacing them breaks
+
+Measured (B7 in `BUGHUNT-MEASUREMENTS.md` at `feb6157`; README "OpenCL on Linux: signal chaining"):
+pocl 5.0 and AMD ROCm 7.14 replace the JVM's handlers once a kernel is built, NVIDIA 580 does not. The
+`libjsig` preload in the launchers and the `SignalChainingCheck` warning stay on for every Linux start.
+
+**Both replace the same set** (`-Xcheck:jni`, pocl measured locally 2026-10-19): `SIGSEGV`, `SIGBUS`,
+`SIGFPE`, `SIGILL`, and also `SIGUSR2` (HotSpot's suspend/resume), `SIGHUP`, `SIGINT`, `SIGTERM`,
+`SIGQUIT`, `SIGTRAP`; only `SIGPIPE` stays with the JVM. What that breaks, measured on pocl with a probe
+that builds the kernel, registers a shutdown hook and waits (`SigProbe4`, the brief has the source):
+
+| Signal / action | pocl, no `libjsig` | pocl with `libjsig` | without OpenCL |
+|---|---|---|---|
+| `SIGTERM` / `SIGINT` / `SIGHUP` | hook runs, exit 143 / 0¹ / 129 | same | same |
+| `SIGQUIT` (`kill -3`) | **no thread dump** | thread dump | thread dump |
+| `jcmd <pid> VM.version` (attach) | works | works | works |
+| JFR method sampling | samples (2767) | samples | samples |
+| 8 hot threads + 2000 safepoints | **crash 5 of 5** (B7) | no crash | no crash |
+
+¹ Not a measurement of `SIGINT`: the probe inherited it as ignored (see the `signal-matrix.sh` item
+below), so it slept out its timeout and exited 0. With default signals ROCm and the Intel CPU runtime
+give 130; pocl was not re-measured that way.
+
+So on pocl the shutdown path survives (LLVM's handler passes these signals on), the thread dump does
+not. **Measured since (B9, `BUGHUNT-MEASUREMENTS.md`, 2026-10-19), now in the README table:** AMD ROCm
+7.14 (MI325X) and 10.1 (Radeon PRO V710) replace the same set with no observable consequence (dump,
+hooks, `jcmd`, JFR, probe 0/5); Intel's CPU runtime 2026.2 replaces it at context creation and crashes
+5/5 without `libjsig` (0/5 with it), `kill -3` still dumps behind a spurious LLVM line.
+
+Still open:
+
+- **Intel GPU (compute-runtime/NEO, `libigc`)** — unmeasured, no Intel GPU was reachable (the only
+  rentable candidate, a Vultr E-2388G bare-metal box, has the iGPU disabled in the BIOS). Any Linux
+  machine with a Gen12+ iGPU will do: `intel-opencl-icd` instead of the oneAPI CPU runtime, then the
+  B9.2 steps. The README row says "not measured" until then.
+- **`signal-matrix.sh` cannot measure `SIGINT`/`SIGHUP`** as written (the script is in the brief, not
+  in the repository): it starts the probe with `&` from a non-interactive bash (and under `nohup`), so
+  both signals arrive as ignored (`SigIgn: 0000000000000003`) and the rows only time out. Before it is
+  used again, start the probe with `env --default-signal=HUP,INT` (coreutils ≥ 8.31) and record a
+  `TIMEOUT` column, as the B9 repeat did; then re-measure pocl's `SIGINT` row above.
+
 ### OpenCL backend abstraction & multi-device coverage (migrated from GitHub issues)
 
 - **Add a test exercising two OpenCL devices simultaneously** (migrated from GitHub issue #6). Current OpenCL coverage drives a **single** device (`ProbeAddressesOpenCLTest`, gated by `OpenCLPlatformAssume`). Add a test that runs **two `producerOpenCL` instances concurrently** (the multi-device path the project supports via multiple `producerOpenCL` entries) and asserts both produce and feed the consumer correctly at the same time.
   - **Scope: two _physical_ OpenCL devices** — e.g. a machine with two GPUs, or one GPU plus a CPU that exposes an OpenCL device. (Not two logical handles to the same device.) Each `producerOpenCL` targets a distinct `(platformIndex, deviceIndex)`.
   - Availability gate: the test must self-skip unless **≥ 2 distinct physical OpenCL devices** are enumerated (extend the `OpenCLPlatformAssume` pattern). Most CI has 0–1 device, so it will usually skip, like the existing OpenCL tests; it is meant to run on a real dual-device host.
 
-### jeromq 0.6.0 poller registration race (upstream bug, worked around in one test)
+### jeromq 0.6.0 poller registration race (upstream bug, fix submitted, test guards in two tests, no product workaround)
 
-- **File it upstream and drop the workaround when a fixed jeromq ships.** `zmq.poll.Poller.run`
+- **Upstream fix submitted: [zeromq/jeromq#1022](https://github.com/zeromq/jeromq/pull/1022)** ("Poller:
+  flush cancelled keys before registering handles (connect hand-off race)", one commit, open as of
+  2026-10-21, in no release; its description names #912/#624 as likely duplicates and #849/#669 as
+  plausible ones). Drop the test guards when a jeromq release carries it. `zmq.poll.Poller.run`
   registers new handles in one "retired" pass per loop iteration: for each handle it looks up
   `handle.fd.keyFor(selector)`, registers the channel when the key is `null`, and updates
   `interestOps` when the key is valid. A key that is *cancelled but not yet deregistered* (that
@@ -590,30 +673,54 @@ spill, and the 256 cap stays even at `-cl-nv-maxrregcount=96`.
     `test` / `test-opencl` jobs of run 35511514278 (2026-09-20) and a run on 2026-08-26, always
     with nothing received in the full budget. The race is platform-independent (pure NIO
     bookkeeping), so the other OS jobs were lucky, not immune.
-  - `KeyProducerJavaZmq` in `CONNECT` mode is exposed to the same stall in production: a hit
-    delays the first key by up to 30 s and then self-heals through jeromq's own reconnect; no
-    message is lost because `PUSH`/`PULL` queues rather than drops. Not changed — a production
-    `setHandshakeIvl` is a behavioural choice for the owner, and `PUSH`-side clients are outside
-    this repo. `KeyProducerJavaZmqTest` uses `timeoutMillis = -1` and the 240 s fork budget, so it
-    only slows down on a stall.
+  - `KeyProducerJavaZmqTest` (F218) caps the handshake of every test-side socket that connects,
+    gives every test its own `@Timeout` with a thread dump, and lets a bound test sender send only
+    after a completed handshake where the producer connects.
+  - **Decided 2026-10-21 (owner): wait for the jeromq release that carries #1022; no fix and no
+    workaround in this repository.** `KeyProducerJavaZmq` in `CONNECT` mode can lose a message (F218's
+    side finding), and that stays as measured until then. The stall delays the first key by up to 30 s,
+    until the handshake timer drops the connection and the producer reconnects; but jeromq 0.6.0
+    creates the bound peer's pipe when it accepts the connection, so a client whose `PUSH` binds can
+    queue a message on the stalled connection before its handshake, and the dropped connection takes
+    the message with it. The fix belongs upstream, where the owner submitted it, so there is no
+    client-side measure and no production `setHandshakeIvl` (which would only shorten the stall, not
+    keep the message). The test guards above are not a product workaround: they keep CI
+    deterministic and stay until the undo list at the end of this section.
   - **`JeromqPollerHandOffRaceTest` is the deterministic, socket-free reproduction and the
     complete write-up** (mechanism, the real connecter-to-engine path, evidence, the shape of the
     fix, the verification plan). It asserts the bug is *present* (20/20 stalls on 0.6.0) with a
     control (same hand-off across two passes works) and the healing path (any later pass
     registers the stuck handle — why the handshake cap works). It goes red on a fixed jeromq.
-  - Plan: fork `zeromq/jeromq` (`master`, code under `jeromq-core/`), apply the retire → flush →
-    register fix in `jeromq-core/src/main/java/zmq/poll/Poller.java`, port the reproduction
-    inverted into `jeromq-core/src/test/java/zmq/poll/` as the regression test, point BAF at the
-    fork (`jeromq.version`), and expect `JeromqPollerHandOffRaceTest` red and
-    `ZmqResultBroadcasterTest` green **without** `HANDSHAKE_IVL_MILLIS`; then PR upstream. The
-    fix was validated once in a local copy (50/50 deterministic, 300 fresh JVMs / 900 real
-    connections with zero stalls) but must be re-proven independently in the fork. Open detail:
-    what makes the mailbox readable in the same select as the connect completion is not
-    established (the signaler's write-then-count order was tested and is not it); irrelevant to
-    the fix, useful for the upstream issue text.
-  - When the fixed jeromq is in use, delete `HANDSHAKE_IVL_MILLIS` + the `connectSubscriber`
-    rationale and re-run `ZmqResultBroadcasterTest` in a loop (≥ 100 fresh forks) before
-    calling it fixed — a single green run proves nothing at a 5 % rate.
+  - The fix (retire → flush → register in `jeromq-core/src/main/java/zmq/poll/Poller.java`) was
+    validated in a local copy (50/50 deterministic, 300 fresh JVMs / 900 real connections with zero
+    stalls) and is what #1022 submits. Open detail for the upstream discussion: what makes the mailbox
+    readable in the same select as the connect completion is not established (the signaler's
+    write-then-count order was tested and is not it).
+  - **When a jeromq release carries the fix:** raise `jeromq.version` in `pom.xml` (0.6.0 today);
+    `JeromqPollerHandOffRaceTest` then goes red, because it asserts the bug is present — invert it
+    into a regression test or delete it; delete `HANDSHAKE_IVL_MILLIS` and the `connectSubscriber`
+    rationale in `ZmqResultBroadcasterTest`; in `KeyProducerJavaZmqTest` drop the handshake cap of
+    `connectSender` and the handshake monitor (`monitorHandshakes`/`awaitHandshake`) and keep the
+    `@Timeout`s as a plain time limit (they bound any hang, not just this one), noting that decision
+    in the class comment; re-run `ZmqResultBroadcasterTest` and `KeyProducerJavaZmqTest` in a loop
+    (≥ 100 fresh forks each, under load) before calling it fixed — a single green run proves nothing
+    at a 5 % rate; and re-check the `CONNECT`-mode loss above against the fixed release (it should be gone).
+
+### Flaky CI tests seen on PR #389 (docs-only change, 2026-10-15)
+
+PR #389 changed only README/CSV/`TODO.md`, so its failures were unrelated to it. The
+`SocketResultBroadcasterTest` timeout is fixed (F191 in `BUGHUNT-FOUND.md`: the tests' port probe was
+counted as a client), the `KeyProducerJavaZmqTest` hang is guarded (F218).
+
+- **`Test (windows-latest)`: "There was a timeout in the fork" in `KeyProducerJavaZmqTest`** — guarded
+  since F218 (per-test `@Timeout` with a thread dump, handshake cap, send after the handshake), measured
+  on Linux under load only (10 of 10 green). Open: confirm on the Windows CI job that a stall now ends
+  as a failure of one test or heals, not as a fork timeout. The cause is the jeromq poller race above;
+  its fix is [zeromq/jeromq#1022](https://github.com/zeromq/jeromq/pull/1022).
+- **`claude-review` (`claude-code-review.yml`) fails on every PR** — #387 … #393 all red, the action
+  ends after well under a second with `is_error: true`, `total_cost_usd: 0` and empty `modelUsage`,
+  i.e. no model call was made. Points at the action's token/credit, not at the PRs. Check the
+  `ANTHROPIC_API_KEY` secret and the credit of the account behind it.
 
 ## Open — cross-cutting (slice for this repo)
 

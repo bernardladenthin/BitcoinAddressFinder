@@ -4,7 +4,10 @@
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 
@@ -12,9 +15,18 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigInteger;
 import java.net.ServerSocket;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import net.ladenthin.bitcoinaddressfinder.core.BatchResult;
 import net.ladenthin.bitcoinaddressfinder.core.Hit;
+import nl.altindag.log.LogCaptor;
 import org.junit.jupiter.api.Test;
 import org.zeromq.SocketType;
 import org.zeromq.ZContext;
@@ -35,7 +47,7 @@ import org.zeromq.ZMQ;
  * the full {@link #AWAIT_MILLIS} elapsed and nothing received. See the helper for what stalls and
  * why the cap is the fix; the deterministic reproduction and the full write-up are in
  * {@link JeromqPollerHandOffRaceTest}, which goes red once a jeromq build fixes the race — that is
- * the moment to delete the cap.
+ * the moment to delete the cap. The fix is submitted as zeromq/jeromq#1022 (open as of 2026-10-21).
  */
 class ZmqResultBroadcasterTest {
 
@@ -50,6 +62,24 @@ class ZmqResultBroadcasterTest {
      * reconnects; jeromq's default is 30 s, twice {@link #AWAIT_MILLIS}.
      */
     private static final int HANDSHAKE_IVL_MILLIS = 1_000;
+
+    /**
+     * Batches of the burst in {@link #close_whileTheSubscriberIsBehind_subscriberStillReceivesTheLastBatch()};
+     * below the publisher's send high-water mark of 1000, so none is dropped before {@code close()}.
+     */
+    private static final int BURST_BATCHES = 800;
+
+    /** Hits per burst batch: the burst (about 20 MB) must exceed what the TCP buffers can hold. */
+    private static final int BURST_HITS_PER_BATCH = 150;
+
+    /** Kernel receive buffer of the lagging subscriber; small, so TCP pushes back early. */
+    private static final int SMALL_RECEIVE_BUFFER_BYTES = 4096;
+
+    /**
+     * Half the 2 s the shipped {@link ZmqResultBroadcaster} lingers: a {@code close()} with a lagging
+     * subscriber that returns sooner did not wait for it.
+     */
+    private static final long HALF_THE_SHIPPED_LINGER_MILLIS = 1_000;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -78,6 +108,50 @@ class ZmqResultBroadcasterTest {
     }
 
     @Test
+    void onBatchChecked_calledFromSeveralConsumerThreads_everyCallReturns() throws Exception {
+        // arrange: ConsumerJava notifies its listeners from consumerJava.threads worker threads,
+        // and a ZeroMQ socket is not thread-safe. Unserialised, concurrent sends corrupted jeromq's
+        // pipe state (IndexOutOfBoundsException inside the send path) and left the senders spinning
+        // forever, i.e. the consumer threads stopped checking keys.
+        final String address = "tcp://127.0.0.1:" + freePort();
+        final ZmqResultBroadcaster broadcaster = new ZmqResultBroadcaster(address);
+        final int threads = 8;
+        final int callsPerThread = 200;
+        final ExecutorService executor = Executors.newFixedThreadPool(threads);
+        try (ZContext context = new ZContext()) {
+            final ZMQ.Socket subscriber = connectSubscriber(context, address);
+            assertThat(
+                    receiveWhilePublishing(
+                            subscriber,
+                            () -> broadcaster.onBatchChecked(new BatchResult(BigInteger.ONE, 1, List.of()))),
+                    is(notNullValue()));
+            final CyclicBarrier start = new CyclicBarrier(threads);
+
+            // act
+            for (int t = 0; t < threads; t++) {
+                executor.execute(() -> {
+                    try {
+                        start.await();
+                    } catch (InterruptedException | BrokenBarrierException e) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                    for (int i = 0; i < callsPerThread; i++) {
+                        broadcaster.onBatchChecked(new BatchResult(BigInteger.valueOf(i), 1, List.of()));
+                    }
+                });
+            }
+            executor.shutdown();
+
+            // assert
+            assertThat(executor.awaitTermination(AWAIT_MILLIS, TimeUnit.MILLISECONDS), is(true));
+        } finally {
+            executor.shutdownNow();
+            broadcaster.close();
+        }
+    }
+
+    @Test
     void onBatchChecked_batchWithHit_subscriberReceivesTheKeyMaterial() throws Exception {
         // arrange
         final String address = "tcp://127.0.0.1:" + freePort();
@@ -97,6 +171,79 @@ class ZmqResultBroadcasterTest {
             broadcaster.close();
         }
     }
+
+    @Test
+    void close_whileTheSubscriberIsBehind_subscriberStillReceivesTheLastBatch() throws Exception {
+        // The last batch messages are the completion signal of a run. With a linger of zero,
+        // closing the socket discarded whatever the PUB socket had not written yet, so a subscriber
+        // that was behind missed exactly the end of the run (F163).
+        //
+        // The broadcaster lingers for AWAIT_MILLIS here, not the shipped 2 s: the drain below must
+        // move the whole burst and parse it, and racing that against the shipped value made the
+        // outcome depend on the speed of the machine. What is pinned is that close() does not
+        // discard pending messages; the shipped bound has its own test below.
+
+        // arrange
+        final String address = "tcp://127.0.0.1:" + freePort();
+        final ZmqResultBroadcaster broadcaster =
+                new ZmqResultBroadcaster(address, new BatchResultJsonFormatter(), AWAIT_MILLIS);
+        final ExecutorService closer = Executors.newSingleThreadExecutor();
+        try (ZContext context = new ZContext()) {
+            final ZMQ.Socket subscriber = connectSubscriberAndFallBehind(context, address, broadcaster);
+
+            // act
+            final Future<?> closed = closer.submit(broadcaster::close);
+
+            // assert
+            final String lastBaseHex = BigInteger.valueOf(BURST_BATCHES).toString(16);
+            boolean lastSeen = false;
+            final long deadline = System.currentTimeMillis() + AWAIT_MILLIS;
+            while (!lastSeen && System.currentTimeMillis() < deadline) {
+                final byte[] received = subscriber.recv(0);
+                if (received == null) {
+                    continue;
+                }
+                final JsonNode message = objectMapper.readTree(new String(received, StandardCharsets.UTF_8));
+                lastSeen = lastBaseHex.equals(message.path("secretBase").asText());
+            }
+            assertThat(lastSeen, is(true));
+            closed.get(AWAIT_MILLIS, TimeUnit.MILLISECONDS);
+        } finally {
+            closer.shutdownNow();
+            broadcaster.close();
+        }
+    }
+
+    /**
+     * The shipped linger bounds the shutdown: a subscriber that has stopped reading delays
+     * {@link ZmqResultBroadcaster#close()} by that long, not longer, and not less. The ceiling is
+     * loose ({@link #AWAIT_MILLIS}) and the floor half the shipped 2 s, so the timing of the machine
+     * only ever moves the measurement away from both: an infinite linger hangs the shutdown, a zero
+     * linger returns at once and discards the pending end of the run.
+     */
+    @Test
+    void close_subscriberStoppedReading_waitsForTheShippedLingerAndThenReturns() throws Exception {
+        // arrange
+        final String address = "tcp://127.0.0.1:" + freePort();
+        final ZmqResultBroadcaster broadcaster = new ZmqResultBroadcaster(address);
+        final ExecutorService closer = Executors.newSingleThreadExecutor();
+        try (ZContext context = new ZContext()) {
+            connectSubscriberAndFallBehind(context, address, broadcaster);
+
+            // act
+            final long start = System.nanoTime();
+            final Future<?> closed = closer.submit(broadcaster::close);
+            closed.get(AWAIT_MILLIS, TimeUnit.MILLISECONDS);
+            final long elapsedMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+
+            // assert
+            assertThat(elapsedMillis, is(greaterThanOrEqualTo(HALF_THE_SHIPPED_LINGER_MILLIS)));
+        } finally {
+            closer.shutdownNow();
+            broadcaster.close();
+        }
+    }
+
     // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="announceConfiguration">
@@ -125,6 +272,27 @@ class ZmqResultBroadcasterTest {
             broadcaster.close();
         }
     }
+
+    /**
+     * A batch reported after {@link ZmqResultBroadcaster#close()} cannot be published any more. That
+     * must be visible in the log, once, instead of the report disappearing without a word.
+     */
+    @Test
+    void onBatchChecked_afterClose_warnsOnceThatTheResultIsNotPublished() {
+        // arrange
+        ZmqResultBroadcaster broadcaster = new ZmqResultBroadcaster("inproc://zmq-result-broadcaster-closed");
+        broadcaster.close();
+        try (LogCaptor logCaptor = LogCaptor.forClass(ZmqResultBroadcaster.class)) {
+            // act
+            broadcaster.onBatchChecked(new BatchResult(BigInteger.ONE, 1, List.of()));
+            broadcaster.onBatchChecked(new BatchResult(BigInteger.TWO, 1, List.of()));
+
+            // assert
+            assertThat(logCaptor.getWarnLogs(), hasSize(1));
+            assertThat(logCaptor.getWarnLogs().get(0), containsString("already closed"));
+        }
+    }
+
     // </editor-fold>
 
     /**
@@ -151,6 +319,42 @@ class ZmqResultBroadcasterTest {
         subscriber.connect(address);
         subscriber.subscribe(ZMQ.SUBSCRIPTION_ALL);
         subscriber.setReceiveTimeOut(RECEIVE_TIMEOUT_MILLIS);
+        return subscriber;
+    }
+
+    /**
+     * Connects a subscriber that holds at most one message and then publishes a burst it does not
+     * read, so the burst stays queued at the publisher.
+     *
+     * <p>Receive high-water mark 1 and a small kernel buffer: the subscriber's I/O thread stops
+     * reading, TCP pushes back, and the publisher keeps the rest. That makes "behind" deterministic
+     * instead of a matter of how fast this thread reads.
+     *
+     * @param context     the context that owns the subscriber
+     * @param address     the publisher's address
+     * @param broadcaster the publisher to drive
+     * @return the subscriber, connected and behind by the burst
+     */
+    private static ZMQ.Socket connectSubscriberAndFallBehind(
+            ZContext context, String address, ZmqResultBroadcaster broadcaster) {
+        final List<Hit> manyHits = new ArrayList<>();
+        for (int i = 0; i < BURST_HITS_PER_BATCH; i++) {
+            manyHits.add(new Hit(BigInteger.valueOf(i), "aabb".repeat(16), "1TestAddress" + i, true, false));
+        }
+        final ZMQ.Socket subscriber = context.createSocket(SocketType.SUB);
+        subscriber.setHandshakeIvl(HANDSHAKE_IVL_MILLIS);
+        subscriber.setRcvHWM(1);
+        subscriber.setReceiveBufferSize(SMALL_RECEIVE_BUFFER_BYTES);
+        subscriber.connect(address);
+        subscriber.subscribe(ZMQ.SUBSCRIPTION_ALL);
+        subscriber.setReceiveTimeOut(RECEIVE_TIMEOUT_MILLIS);
+        assertThat(
+                receiveWhilePublishing(
+                        subscriber, () -> broadcaster.onBatchChecked(new BatchResult(BigInteger.ZERO, 1, List.of()))),
+                is(notNullValue()));
+        for (long base = 1; base <= BURST_BATCHES; base++) {
+            broadcaster.onBatchChecked(new BatchResult(BigInteger.valueOf(base), 1, manyHits));
+        }
         return subscriber;
     }
 

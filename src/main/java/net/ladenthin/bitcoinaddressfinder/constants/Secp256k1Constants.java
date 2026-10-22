@@ -40,7 +40,7 @@ public final class Secp256k1Constants {
      * implementation.
      *
      * <p>While the secp256k1 specification allows private keys in the range
-     * {@code [0x1, MAX_PRIVATE_KEY]} (i.e. including {@code 1}), this
+     * {@code [0x1, MAX_PRIVATE_KEY)} (i.e. including {@code 1}), this
      * implementation deliberately excludes {@code 1}. The exclusion avoids
      * edge cases in downstream libraries (notably
      * {@link org.bitcoinj.crypto.ECKey#fromPrivate(java.math.BigInteger, boolean)})
@@ -63,8 +63,8 @@ public final class Secp256k1Constants {
             MIN_VALID_PRIVATE_KEY.toString(Radix.HEX).toUpperCase(Locale.ROOT);
 
     /**
-     * Uppercase hexadecimal representation of the secp256k1 group order
-     * (the maximum valid private key).
+     * Uppercase hexadecimal representation of the secp256k1 group order {@code n},
+     * the exclusive upper bound of the private keys.
      *
      * <p>This is the public curve parameter {@code n} from
      * <a href="https://www.secg.org/sec2-v2.pdf">SEC 2 v2</a>, &sect;2.4.1
@@ -76,14 +76,26 @@ public final class Secp256k1Constants {
     public static final String MAX_PRIVATE_KEY_HEX = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141";
 
     /**
-     * The maximum valid private key according to the secp256k1
-     * specification &mdash; the group order of the curve.
+     * The secp256k1 group order {@code n}, the exclusive upper bound of the private keys:
+     * valid keys are below it, and {@code n} itself is not one ({@code n·G} is the point at
+     * infinity, which has no public key).
      *
      * <p>Parsed from {@link #MAX_PRIVATE_KEY_HEX} via {@link Radix#HEX} so
      * the "16" radix is named at the single source of truth in the same
      * leaf package, never inlined.
      */
     public static final BigInteger MAX_PRIVATE_KEY = new BigInteger(MAX_PRIVATE_KEY_HEX, Radix.HEX);
+    /**
+     * The largest valid private key, {@code n - 1}: the inclusive counterpart of the exclusive bound
+     * {@link #MAX_PRIVATE_KEY}, for places that name the last key of a range.
+     */
+    public static final BigInteger MAX_VALID_PRIVATE_KEY = MAX_PRIVATE_KEY.subtract(BigInteger.ONE);
+    /**
+     * Uppercase hexadecimal representation of {@link #MAX_VALID_PRIVATE_KEY}, for the configuration
+     * layer's wire-format defaults (the inclusive end of the incremental key producer).
+     */
+    public static final String MAX_VALID_PRIVATE_KEY_HEX =
+            MAX_VALID_PRIVATE_KEY.toString(Radix.HEX).toUpperCase(Locale.ROOT);
 
     /**
      * Replacement value substituted for private keys that fall outside the
