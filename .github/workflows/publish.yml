@@ -585,6 +585,8 @@ jobs:
     if: needs.check-snapshot.result == 'success' && inputs.publish_to_central
     runs-on: ubuntu-latest
     environment: maven-central
+    outputs:
+      assets_complete: ${{ steps.collect.outputs.complete }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
@@ -653,14 +655,9 @@ jobs:
       # the signed jars and poms + .asc files already exist in target/ (signing happens at
       # verify). Collecting on failure lets the github-snapshot job still attach them.
       - name: Collect signed artifacts
+        id: collect
         if: ${{ !cancelled() }}
-        run: |
-          mkdir -p signed-snapshot-assets
-          cp target/*.jar signed-snapshot-assets/ 2>/dev/null || true
-          cp target/*.jar.asc signed-snapshot-assets/ 2>/dev/null || true
-          # maven-gpg writes target/<artifactId>-<version>.pom next to its .pom.asc; Central has both.
-          cp target/*.pom signed-snapshot-assets/ 2>/dev/null || true
-          cp target/*.pom.asc signed-snapshot-assets/ 2>/dev/null || true
+        run: python3 .github/collect-release-assets.py signed-snapshot-assets
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: ${{ !cancelled() }}
         with:
@@ -675,9 +672,14 @@ jobs:
     # the GitHub pre-release assets must not be lost in that case.
     if: ${{ !cancelled() && (needs.publish-snapshot.result == 'success' || needs.publish-snapshot.result == 'failure') }}
     runs-on: ubuntu-latest
+    # Serialize the complete upload, tag/notes update and pruning operation.
+    concurrency:
+      group: snapshot-release-${{ github.repository }}
+      cancel-in-progress: false
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: signed-snapshot-assets
@@ -691,104 +693,12 @@ jobs:
         # still loudly red rather than quietly wrong.
         # See workspace/policies/fat-jar-release-assets.md, "Attach first, then go red".
         id: signatures
-        run: |
-          set -uo pipefail
-          dir="snapshot-assets"
-          # Every attachable artifact type, not only jars: with '*.jar' alone the AARs were attached
-          # unsigned for months and nothing counted them, so the job reported success.
-          artifacts=$(find "$dir" -maxdepth 1 \( -name '*.jar' -o -name '*.aar' -o -name '*.pom' \) | sort)
-          if [ -z "$artifacts" ]; then
-            echo "::error::no artifacts in $dir -- the collection step produced nothing"
-            echo "missing=-1" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          missing=0
-          for artifact in $artifacts; do
-            if [ ! -e "$artifact.asc" ]; then
-              echo "::error::unsigned: $(basename "$artifact") has no detached .asc"
-              missing=$((missing + 1))
-            fi
-          done
-          echo "missing=$missing" >> "$GITHUB_OUTPUT"
-          [ "$missing" -eq 0 ] && echo "all $(echo "$artifacts" | wc -l) artifact(s) signed"
-          exit 0
-      - name: Update snapshot pre-release
+        run: python3 .github/report-asset-signatures.py snapshot-assets
+      - name: Update snapshot assets, source tag and notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release view snapshot --repo ${{ github.repository }} 2>/dev/null \
-            || gh release create snapshot \
-                 --repo ${{ github.repository }} \
-                 --prerelease \
-                 --title "Snapshot (latest)" \
-                 --notes "Latest snapshot build from the main branch."
-          gh release upload snapshot snapshot-assets/* \
-            --repo ${{ github.repository }} \
-            --clobber
-      - name: Remove the assets this run did not upload
-        # `snapshot` is a rolling "latest" pre-release, and `gh release upload --clobber` replaces
-        # same-named assets but never removes any other, so every asset of every past version stayed
-        # forever: 208 on java-llama.cpp (109 of them from 5.0.x, 43 in shapes that no longer exist),
-        # and SpotBugs plugin jars an old collect step attached in 2026-05 on three repositories. A
-        # non-current asset on this release is noise by definition. The keep-set is what this run
-        # uploaded -- the files in the asset directory -- never a version pattern, which would have to
-        # be re-taught at every classifier added or dropped (how the stale shapes arose). AFTER the
-        # upload on purpose: a failed upload must not leave the release emptier than it was. And only
-        # here: a versioned v* release is history, github-release never deletes anything. Every
-        # deletion is printed by name, so the job log is the audit trail.
-        #
-        # Asset by asset, never the release. The first form of this job (2026-05-07) deleted the whole
-        # `snapshot` release with its tag and recreated it; on 2026-05-10 the runs of several main
-        # pushes minutes apart deleted it under each other, and every job of each burst but the last
-        # failed in that step with its artifacts present. The job then went with the Central
-        # migration and came back as `view || create` + `upload --clobber` without any cleanup, which
-        # is how the backlog grew (workspace/policies/fat-jar-release-assets.md has the runs). Hence
-        # three guards: an empty upload is refused (every asset would count as stale; the download
-        # and upload steps above fail first, the guard keeps it so), an asset that is already gone
-        # counts as removed (two overlapping dispatches may both pick it), and a failed deletion is
-        # reported and the rest still tried -- the assets of this upload are on the release either
-        # way, so this is "attach first, then red" like the signature check.
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          keep="$(ls -1 snapshot-assets | sort)"
-          if [ -z "$keep" ]; then
-            echo "::error::refusing to prune: this run uploaded nothing, so every asset of the release would count as stale"
-            exit 1
-          fi
-          list_assets() {
-            gh release view snapshot --repo ${{ github.repository }} --json assets --jq '.assets[].name' | sort
-          }
-          current="$(list_assets)"
-          stale="$(comm -13 <(printf '%s\n' "$keep") <(printf '%s\n' "$current"))"
-          if [ -z "$stale" ]; then
-            echo "nothing to remove: the release holds exactly the $(printf '%s\n' "$keep" | wc -l) asset(s) of this upload"
-            exit 0
-          fi
-          echo "removing $(printf '%s\n' "$stale" | wc -l) asset(s) that are not part of this upload:"
-          failed=0
-          while IFS= read -r name; do
-            [ -n "$name" ] || continue
-            echo "  deleting $name"
-            if gh release delete-asset snapshot "$name" --repo ${{ github.repository }} --yes; then
-              continue
-            fi
-            if ! remaining="$(list_assets)"; then
-              echo "::error::could not delete $name, and could not re-read the release to tell whether it is gone"
-              failed=$((failed + 1))
-            elif printf '%s\n' "$remaining" | grep -qxF -- "$name"; then
-              echo "::error::could not delete $name"
-              failed=$((failed + 1))
-            else
-              echo "  $name was already gone"
-            fi
-          done <<< "$stale"
-          if [ "$failed" -ne 0 ]; then
-            echo "::error::$failed asset(s) could not be removed; the $(printf '%s\n' "$keep" | wc -l) asset(s) of this upload are on the release"
-            exit 1
-          fi
-          echo "kept the $(printf '%s\n' "$keep" | wc -l) asset(s) of this upload"
+          ASSETS_COMPLETE: ${{ needs.publish-snapshot.outputs.assets_complete }}
+        run: python3 .github/update-snapshot.py snapshot-assets
       - name: Fail if anything was attached unsigned
         # After the upload on purpose: the assets must exist even when the signature does not.
         if: ${{ always() && steps.signatures.outputs.missing != '0' }}
@@ -802,6 +712,8 @@ jobs:
     if: needs.check-tag.result == 'success' && inputs.publish_to_central
     runs-on: ubuntu-latest
     environment: maven-central
+    outputs:
+      assets_complete: ${{ steps.collect.outputs.complete }}
     permissions:
       contents: write
     steps:
@@ -859,14 +771,9 @@ jobs:
       # the signed jars and poms + .asc files already exist in target/ (signing happens at
       # verify). Collecting on failure lets the github-release job still attach them.
       - name: Collect signed artifacts
+        id: collect
         if: ${{ !cancelled() }}
-        run: |
-          mkdir -p signed-release-assets
-          cp target/*.jar signed-release-assets/ 2>/dev/null || true
-          cp target/*.jar.asc signed-release-assets/ 2>/dev/null || true
-          # maven-gpg writes target/<artifactId>-<version>.pom next to its .pom.asc; Central has both.
-          cp target/*.pom signed-release-assets/ 2>/dev/null || true
-          cp target/*.pom.asc signed-release-assets/ 2>/dev/null || true
+        run: python3 .github/collect-release-assets.py signed-release-assets
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: ${{ !cancelled() }}
         with:
@@ -884,6 +791,7 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: signed-release-assets
@@ -897,27 +805,7 @@ jobs:
         # still loudly red rather than quietly wrong.
         # See workspace/policies/fat-jar-release-assets.md, "Attach first, then go red".
         id: signatures
-        run: |
-          set -uo pipefail
-          dir="release-assets"
-          # Every attachable artifact type, not only jars: with '*.jar' alone the AARs were attached
-          # unsigned for months and nothing counted them, so the job reported success.
-          artifacts=$(find "$dir" -maxdepth 1 \( -name '*.jar' -o -name '*.aar' -o -name '*.pom' \) | sort)
-          if [ -z "$artifacts" ]; then
-            echo "::error::no artifacts in $dir -- the collection step produced nothing"
-            echo "missing=-1" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          missing=0
-          for artifact in $artifacts; do
-            if [ ! -e "$artifact.asc" ]; then
-              echo "::error::unsigned: $(basename "$artifact") has no detached .asc"
-              missing=$((missing + 1))
-            fi
-          done
-          echo "missing=$missing" >> "$GITHUB_OUTPUT"
-          [ "$missing" -eq 0 ] && echo "all $(echo "$artifacts" | wc -l) artifact(s) signed"
-          exit 0
+        run: python3 .github/report-asset-signatures.py release-assets
       - name: Upload release assets
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
         with:
