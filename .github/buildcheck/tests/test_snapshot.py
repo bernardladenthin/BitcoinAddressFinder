@@ -200,6 +200,16 @@ class SnapshotTest(unittest.TestCase):
                     with self.assertRaisesRegex(RuntimeError, "403"):
                         gh.api("GET", "repos/owner/repo/releases/tags/snapshot", optional=True)
 
+    def test_release_upload_jobs_do_not_persist_checkout_credentials(self):
+        jobs = workflow.parse((Path(REPO) / ".github/workflows/publish.yml").read_text())
+        versioned = "github-release" if "github-release" in jobs else "github-release-signed"
+        for name in ("github-snapshot", versioned):
+            checkouts = [step for step in jobs[name].steps()
+                         if any("uses: actions/checkout@" in line for line in step)]
+            self.assertTrue(checkouts, name)
+            for step in checkouts:
+                self.assertIn("          persist-credentials: false", step, name)
+
 
 if __name__ == "__main__":
     unittest.main()
