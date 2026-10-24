@@ -187,16 +187,14 @@ class ReleaseAssetsTest(unittest.TestCase):
         jobs = workflow.parse((Path(REPO) / ".github/workflows/publish.yml").read_text())
         for kind in ("snapshot", "release"):
             job = jobs[f"publish-{kind}"].text
-            self.assertIn(f"python3 .github/collect-release-assets.py signed-{kind}-assets", job)
-            self.assertIn("assets_complete: $" + "{{ steps.preflight.outputs.complete }}", job)
-            self.assertIn("        id: collect", job)
-            attach = jobs["github-snapshot" if kind == "snapshot" else
-                          "github-release" if "github-release" in jobs else "github-release-signed"].text
+            self.assertIn("uses: ./.github/actions/finalize-publication", job)
+            self.assertIn(f"channel: {kind}", job)
+            self.assertIn("assets_complete: $" + "{{ steps.finalize.outputs.complete }}", job)
+            self.assertIn("        id: finalize", job)
+            attach = jobs[f"github-{kind}"].text
             self.assertIn(f"python3 .github/publication.py verify publication-package --export-github {kind}-assets", attach)
             self.assertNotIn("Fail if anything", attach)
-        if configuration(REPO).get("maven", {}).get("cyclonedx", False):
-            for kind in ("snapshot", "release"):
-                self.assertIn(f"signed-{kind}-assets/*.json", jobs[f"publish-{kind}"].text)
+            self.assertIn("subject-path: publication-package/github/*", jobs[f"attest-{kind}"].text)
 
     def test_current_repository_contract_collects_exact_complete_and_partial_fixture(self):
         # Exercise this checkout's real POMs and JSON, not just a hand-written generic fixture.

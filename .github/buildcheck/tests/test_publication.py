@@ -110,17 +110,32 @@ class PublicationTest(unittest.TestCase):
 
     def test_publishers_depend_only_on_the_same_checked_handoff(self):
         jobs = workflow.parse((Path(REPO) / '.github/workflows/publish.yml').read_text())
+        action = (Path(REPO) / '.github/actions/finalize-publication/action.yml').read_text()
+        self.assertIn('steps.ready.outputs.complete', action)
+        order = ['id: collect', 'id: preflight', 'id: handoff', 'id: ready']
+        self.assertEqual([action.index(item) for item in order], sorted(action.index(item) for item in order))
+        self.assertIn('if-no-files-found: error', action)
+        self.assertNotIn('always()', action)
+        self.assertNotIn('continue-on-error', action)
         for channel in ['snapshot', 'release']:
             prep = jobs['publish-' + channel]
-            central = jobs['central-' + channel]
-            github_name = 'github-snapshot' if channel == 'snapshot' else ('github-release' if 'github-release' in jobs else 'github-release-signed')
-            github = jobs[github_name]
-            self.assertEqual(central.needs, ['publish-' + channel])
-            self.assertEqual(github.needs, ['publish-' + channel])
-            self.assertIn('steps.preflight.outputs.complete', prep.text)
-            self.assertLess(prep.text.index('publication.py prepare'), prep.text.index('uses: actions/upload-artifact@'))
+            self.assertIn('steps.finalize.outputs.complete', prep.text)
+            self.assertIn('uses: ./.github/actions/finalize-publication', prep.text)
+            self.assertIn('channel: ' + channel, prep.text)
+            self.assertNotIn('publication.py prepare', prep.text)
+            self.assertNotIn('attestations: write', prep.text)
+            self.assertNotIn('id-token: write', prep.text)
             self.assertIn('-DskipUpload=true deploy', prep.text)
             self.assertNotIn('publishAllPublicationsToCentralSnapshotsRepository', prep.text)
-            self.assertIn('publication.py upload publication-package', central.text)
-            self.assertIn('publication.py verify publication-package', github.text)
-            self.assertNotIn('Fail if anything', github.text)
+            for consumer in ['central', 'github', 'attest']:
+                job = jobs[consumer + '-' + channel]
+                self.assertEqual(job.needs, ['publish-' + channel])
+                self.assertIn("needs.publish-" + channel + ".outputs.assets_complete == 'true'", job.text)
+                self.assertIn('digest-mismatch: error', job.text)
+            self.assertIn('publication.py upload publication-package', jobs['central-' + channel].text)
+            self.assertIn('publication.py verify publication-package', jobs['github-' + channel].text)
+            attest = jobs['attest-' + channel].text
+            self.assertLess(attest.index('publication.py verify'), attest.index('uses: actions/attest-build-provenance@'))
+            self.assertIn('subject-path: publication-package/github/*', attest)
+            self.assertIn('id-token: write', attest)
+            self.assertIn('attestations: write', attest)

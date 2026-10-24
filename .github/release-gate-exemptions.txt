@@ -16,3 +16,5 @@ verify-signing-key: red by design where the secret is withheld (forks, other con
 verify-signing-key-gradle: same as verify-signing-key, for the Gradle/BouncyCastle signing path
 central-snapshot: Independent post-preflight Central transfer; must not gate the GitHub publication path.
 central-release: Independent post-preflight Central transfer; must not gate the GitHub publication path.
+attest-snapshot: Independent provenance after the secured handoff; cannot gate either publication consumer.
+attest-release: Independent provenance after the secured handoff; cannot gate either publication consumer.

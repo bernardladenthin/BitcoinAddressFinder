@@ -13,8 +13,8 @@ repository contract and run one complete local gate. Missing files, invalid sign
 version mismatches or differing Central/GitHub bytes must fail before either publisher runs.
 
 After the gate, neither publisher compiles, packages nor signs artifacts again. Both use the
-same frozen package from GitHub Actions. The Central and GitHub Release jobs depend only on
-that handoff, never on each other's success. A Central outage must not hide the GitHub files.
+same frozen package from GitHub Actions. The Central, GitHub Release and provenance attestation jobs depend only on
+that secured handoff, never on each other's success. A Central outage must not hide the GitHub files.
 Internal compiler caches, test reports and native-build intermediates are not publication packages.
 
 ## Preparation
@@ -29,19 +29,30 @@ Preserve the signed Maven files before any later fat-jar rebuild can overwrite `
 ```bash
 python3 .github/collect-release-assets.py central-assets --maven-only
 # Build and sign additional GitHub-only variants.
-python3 .github/collect-release-assets.py signed-release-assets --maven-assets central-assets
-python3 .github/publication.py prepare signed-release-assets publication-package
 ```
 
-Use `signed-snapshot-assets` on the snapshot path. A repository without a subsequent rebuild
-can collect directly without the intermediate `central-assets` directory.
+Finish both publication channels with the shared, checksummed composite action:
+
+```yaml
+- name: Finalize and secure the signed publication
+  id: finalize
+  uses: ./.github/actions/finalize-publication
+  with:
+    channel: release # snapshot for the rolling snapshot
+    maven-assets: central-assets # omit when no outputs need preserving
+```
+
+The action collects the exact contract, calls `publication.py prepare`, and uploads the frozen
+`publication-package/` as `signed-release-assets` or `signed-snapshot-assets`.
+The preparation job exports `assets_complete: ${{ steps.finalize.outputs.complete }}`.
 
 The gate checks exact file membership, nonempty artifacts/signatures, cryptographic GPG
 verification, and byte equality between Central staging and the corresponding GitHub files.
 It freezes `central/` in Maven layout, `github/` as flat release files, and a `manifest.json`
-with commit, version, channel, file sizes and SHA-256. `complete=true` is emitted only after
-success. The handoff upload is allowed only after that gate, even if an optional provenance
-attestation subsequently fails. No incomplete publication package is attached to a release.
+with commit, version, channel, file sizes and SHA-256. The composite's `complete=true` output
+is emitted only after both the local gate and the Actions handoff upload succeed. A failed
+collection, gate or handoff upload cannot release a consumer. No incomplete publication package
+is attached to a release.
 
 ## Repository configuration
 
@@ -65,6 +76,16 @@ python3 .github/publication.py upload publication-package
 Each consumer verifies the complete handoff manifest after download. This is a transport
 integrity check, not a second build/signing pass. GitHub publishes only the exported `github/`
 files; transport manifests and Central repository directories are not release attachments.
+
+All four repositories use identical `central-snapshot`, `central-release`, `github-snapshot`,
+`github-release`, `attest-snapshot` and `attest-release` jobs, tracked as shared workflow fragments.
+Each needs only the matching preparation job and requires its successful handoff output.
+
+The attestation job verifies the downloaded manifest first, then attests every frozen file in
+`publication-package/github/*`, including detached signatures and configured BOMs. It alone among
+the finalization/attestation jobs requests `id-token: write` and `attestations: write`; it needs no
+signing key. Attestation failure remains visible but cannot prevent either publisher from running.
+Existing producer-specific attestations for native build outputs remain applicable independently.
 
 For releases, the Central consumer forms a Portal bundle from the frozen Central files with
 checksums and requests automatic publication. It waits only for HTTP upload acceptance and
