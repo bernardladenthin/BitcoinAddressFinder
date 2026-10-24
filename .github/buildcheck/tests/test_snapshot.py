@@ -101,9 +101,11 @@ class SnapshotTest(unittest.TestCase):
         self.assertTrue(all(c[0] == "GET" for c in self.gh.calls))
 
     def test_empty_signature_or_orphan_also_prevents_promotion(self):
-        for name in ("new.json.asc", "orphan.jar.asc"):
+        for name, content in (("new.json.asc", ""), ("orphan.jar.asc", "signature")):
             with self.subTest(name=name):
-                (self.assets / name).write_text("")
+                (self.assets / "new.json.asc").write_text("signature")
+                (self.assets / name).write_text(content)
+                self.gh.calls.clear()
                 with self.assertRaisesRegex(ValueError, "collection is incomplete"):
                     self.publish()
                 self.assertFalse(any(c[0] in ("PATCH", "DELETE") for c in self.gh.calls))
