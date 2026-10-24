@@ -188,12 +188,12 @@ class ReleaseAssetsTest(unittest.TestCase):
         for kind in ("snapshot", "release"):
             job = jobs[f"publish-{kind}"].text
             self.assertIn(f"python3 .github/collect-release-assets.py signed-{kind}-assets", job)
-            self.assertIn("assets_complete: $" + "{{ steps.collect.outputs.complete }}", job)
+            self.assertIn("assets_complete: $" + "{{ steps.preflight.outputs.complete }}", job)
             self.assertIn("        id: collect", job)
             attach = jobs["github-snapshot" if kind == "snapshot" else
                           "github-release" if "github-release" in jobs else "github-release-signed"].text
-            self.assertIn(f"python3 .github/report-asset-signatures.py {'snapshot' if kind == 'snapshot' else 'release'}-assets", attach)
-            self.assertLess(attach.index("id: signatures"), attach.index("      - name: Fail if anything"))
+            self.assertIn(f"python3 .github/publication.py verify publication-package --export-github {kind}-assets", attach)
+            self.assertNotIn("Fail if anything", attach)
         if configuration(REPO).get("maven", {}).get("cyclonedx", False):
             for kind in ("snapshot", "release"):
                 self.assertIn(f"signed-{kind}-assets/*.json", jobs[f"publish-{kind}"].text)

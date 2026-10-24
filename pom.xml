@@ -1260,10 +1260,8 @@ SPDX-License-Identifier: Apache-2.0
                         <configuration>
                             <publishingServerId>central</publishingServerId>
                             <autoPublish>true</autoPublish>
-                            <!-- validated: wait only for portal validation (where real errors surface), not the slow server-side publish; autoPublish completes it -->
-                            <waitUntil>validated</waitUntil>
-                            <!-- seconds; generous headroom for the validation poll (default 1800) -->
-                            <waitMaxTime>21600</waitMaxTime>
+                            <!-- uploaded: acknowledge transfer only; Central validates and publishes asynchronously -->
+                            <waitUntil>uploaded</waitUntil>
                         </configuration>
                     </plugin>
                 </plugins>

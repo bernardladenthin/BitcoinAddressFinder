@@ -14,3 +14,5 @@ github-snapshot: runs after publishing; attaches the assets to the rolling snaps
 github-release: runs after publishing; attaches the signed assets to the tag release
 verify-signing-key: red by design where the secret is withheld (forks, other contributors' branches); the publish jobs sign with the same key and fail on it themselves
 verify-signing-key-gradle: same as verify-signing-key, for the Gradle/BouncyCastle signing path
+central-snapshot: Independent post-preflight Central transfer; must not gate the GitHub publication path.
+central-release: Independent post-preflight Central transfer; must not gate the GitHub publication path.

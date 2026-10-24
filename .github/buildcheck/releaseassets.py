@@ -33,9 +33,15 @@ def configuration(root, path=None):
     """Read the explicit contract; unknown keys fail instead of silently dropping assets."""
     path = Path(path) if path is not None else Path(root) / ".github/release-assets.json"
     config = json.loads(path.read_text())
-    _keys(config, ("schema", "maven", "files"), "release asset configuration")
+    _keys(config, ("schema", "maven", "files", "publication"), "release asset configuration")
     if type(config.get("schema")) is not int or config["schema"] != 1:
         raise ValueError("release asset configuration requires schema: 1")
+    publication = config.get("publication", {})
+    _keys(publication, ("central_roots",), "publication configuration")
+    if "central_roots" in publication and (not isinstance(publication["central_roots"], list)
+            or not publication["central_roots"]
+            or any(not isinstance(path, str) or not path for path in publication["central_roots"])):
+        raise ValueError("publication.central_roots must be a nonempty list of paths")
     maven = config.get("maven", {})
     _keys(maven, ("standalone", "cyclonedx"), "maven configuration")
     if not isinstance(maven.get("standalone", []), list):
@@ -44,6 +50,9 @@ def configuration(root, path=None):
         raise ValueError("maven.cyclonedx must be a boolean")
     if not isinstance(config.get("files", []), list):
         raise ValueError("files must be a list")
+    for rule in config.get("files", []):
+        if isinstance(rule, dict) and "central" in rule and type(rule["central"]) is not bool:
+            raise ValueError("file rule central must be a boolean")
     return config
 
 
@@ -111,7 +120,7 @@ def file_classifiers(root, index, config_path=None):
         item = config.get("files", [])[index]
     except IndexError as error:
         raise ValueError(f"no file rule at index {index}") from error
-    _keys(item, ("source", "name", "classifiers"), "file rule")
+    _keys(item, ("source", "name", "classifiers", "central"), "file rule")
     return _classifiers(Path(root).resolve(), item.get("classifiers", [""]))
 
 
@@ -138,7 +147,7 @@ def collect(root, destination, config_path=None, *, maven_only=False, maven_asse
             expected.append((Path(maven_assets) / name if maven_assets is not None else source, name))
 
     for item in [] if maven_only else config.get("files", []):
-        _keys(item, ("source", "name", "classifiers"), "file rule")
+        _keys(item, ("source", "name", "classifiers", "central"), "file rule")
         for classifier in _classifiers(root, item.get("classifiers", [""])):
             pattern = _format(item.get("source"), version, classifier)
             _inside(root, pattern)

@@ -580,16 +580,21 @@ jobs:
         run: echo "Confirmed on tag ${{ github.ref }}"
 
   publish-snapshot:
-    name: Publish Snapshot to Central
-    needs: [check-snapshot, code-style, smoke-fatjar, shared-files, vmlens]
+    name: Prepare and verify signed snapshot artifacts
+    needs:
+      - check-snapshot
+      - code-style
+      - smoke-fatjar
+      - shared-files
+      - vmlens
     if: needs.check-snapshot.result == 'success' && inputs.publish_to_central
     runs-on: ubuntu-latest
     environment: maven-central
     outputs:
-      assets_complete: ${{ steps.collect.outputs.complete }}
+      assets_complete: ${{ steps.preflight.outputs.complete }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         with:
           java-version-file: .java-version
           distribution: temurin
@@ -605,122 +610,81 @@ jobs:
           VERSION=$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version | tail -n1)
           echo "Resolved project version: $VERSION"
           case "$VERSION" in
-            *-SNAPSHOT) echo "OK: -SNAPSHOT version, continuing snapshot deploy." ;;
+            *-SNAPSHOT) echo "OK: -SNAPSHOT version, continuing local snapshot staging." ;;
             *) echo "::error::Refusing to publish non-SNAPSHOT version '$VERSION' from the snapshot job. Snapshot publishing requires a -SNAPSHOT version; releases go through the v* tag path."; exit 1 ;;
           esac
-      # Informational only (nothing depends on it): logs the effective POM with the same
-      # profile as the deploy below, so the resolved central-publishing configuration
-      # (waitUntil/waitMaxTime etc.) is visible for debugging.
       - name: Show effective POM (debug)
-        run: mvn --batch-mode --no-transfer-progress -P release help:effective-pom
-      # -Dmaven.repository.credentialScope=id: Maven 3.10 (on the runners since 2026-10) sends a server's
-      # credentials only to its declared origins, and for the id `central` that is repo.maven.apache.org --
-      # an upload to central.sonatype.com then goes out anonymously and fails with HTTP 401.
-      # Restores id-only matching; replace with setup-java's `mvn-server-repository-origins:
-      # central:https://central.sonatype.com` once a release of setup-java ships that input.
-      - name: Deploy snapshot
-        run: mvn --batch-mode --no-transfer-progress -Dmaven.repository.credentialScope=id -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -P release deploy -DskipTests
+        run: mvn --batch-mode --no-transfer-progress -P release -DskipUpload=true help:effective-pom
+      - name: Stage snapshot
+        run: mvn --batch-mode --no-transfer-progress -Dmaven.repository.credentialScope=id -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -P release -DskipUpload=true deploy
+          -DskipTests
         env:
-          MAVEN_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
-          MAVEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-      # Build + GPG-sign the runnable fat jar (bitcoinaddressfinder-<version>-jar-with-dependencies.jar)
-      # as a GitHub-Release asset ONLY — it is deliberately NOT deployed to Maven Central. The Deploy
-      # step above (`-P release deploy`, no `assembly`) already pushed the main/sources/javadoc jars to
-      # Central; this second invocation adds the `assembly` profile and stops at `verify` (never
-      # reaching `deploy`), so the central-publishing plugin's publish goal — bound to the deploy phase —
-      # does nothing here. `verify` runs: package (assembly `single` attaches the fat jar) → verify
-      # (maven-gpg-plugin signs every attached artifact, incl. the fat jar → .jar.asc). It rebuilds and
-      # re-signs the main/sources jars in target/ too (harmless), so the Collect step below now
-      # also finds the fat jar + its .asc. Runs only if the deploy succeeded.
-      #
-      # -Dmaven.javadoc.skip=true is REQUIRED here: this invocation shares target/ with the Deploy
-      # step above with no `mvn clean` between them. That step's own module-info-compile execution
-      # already left target/classes/module-info.class on disk, so THIS invocation's attach-javadocs
-      # would see the module descriptor and flip into JPMS module mode — before this invocation's own
-      # module-info-compile even runs, since attach-javadocs is ordered first (see CLAUDE.md "JPMS
-      # module descriptor" section). The single-invocation "javadoc before module-info-compile"
-      # ordering fix protects against a fresh compile within one invocation; it does nothing against
-      # a *prior* invocation's leftover module-info.class (2026-08-02 incident, run 30768800950:
-      # "error: No source files for package net.ladenthin.bitcoinaddressfinder.io"). Safe to skip:
-      # the Deploy step already built + signed a correct, classpath-mode javadoc jar, and this
-      # invocation never touches or re-signs it — the untouched javadoc.jar + javadoc.jar.asc from
-      # the Deploy step are what the Collect step below picks up.
-      - name: Build & sign fat jar (GitHub asset only — not deployed to Central)
+      - name: Preserve signed Central outputs before the fat jar rebuild
+        run: python3 .github/collect-release-assets.py central-assets --maven-only
+      - name: "Build & sign fat jar (GitHub asset only \u2014 not deployed to Central)"
         run: mvn --batch-mode --no-transfer-progress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -Dmaven.javadoc.skip=true -P release,assembly verify -DskipTests
         env:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-      # Runs even when the deploy step failed: a Central publish-poll timeout reds the
-      # job *after* the bundle was uploaded (and typically published server-side), while
-      # the signed jars and poms + .asc files already exist in target/ (signing happens at
-      # verify). Collecting on failure lets the github-snapshot job still attach them.
       - name: Collect signed artifacts
         id: collect
-        if: ${{ !cancelled() }}
-        run: python3 .github/collect-release-assets.py signed-snapshot-assets
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        if: ${{ !cancelled() }}
+        run: python3 .github/collect-release-assets.py signed-snapshot-assets --maven-assets central-assets
+      - name: Verify and freeze the complete signed publication
+        id: preflight
+        run: python3 .github/publication.py prepare signed-snapshot-assets publication-package
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: signed-snapshot-assets
-          path: signed-snapshot-assets/
+          path: publication-package/
+          if-no-files-found: error
+        if: ${{ !cancelled() && steps.preflight.outcome == 'success' }}
 
   github-snapshot:
     name: Update Snapshot Pre-release on GitHub
-    needs: [publish-snapshot]
-    # Also runs when publish-snapshot FAILED (not when skipped/cancelled): a Central
-    # publish-poll timeout reds that job after the artifacts were already uploaded —
-    # the GitHub pre-release assets must not be lost in that case.
-    if: ${{ !cancelled() && (needs.publish-snapshot.result == 'success' || needs.publish-snapshot.result == 'failure') }}
+    needs:
+      - publish-snapshot
+    if: ${{ !cancelled() && needs.publish-snapshot.outputs.assets_complete == 'true' }}
     runs-on: ubuntu-latest
-    # Serialize the complete upload, tag/notes update and pruning operation.
     concurrency:
       group: snapshot-release-${{ github.repository }}
       cancel-in-progress: false
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: signed-snapshot-assets
-          path: snapshot-assets/
-      - name: Report unsigned assets (does not block the upload)
-        # Deliberately NON-blocking, and deliberately BEFORE the upload. Both attach jobs run even
-        # when their publish job failed, because a Central publish-poll timeout must not cost the
-        # GitHub assets: if Central is unreachable these are the ONLY way to get the artifacts at
-        # all. Refusing to attach on a signing failure would defeat exactly that. So annotate here,
-        # upload regardless, and fail the job afterwards. Assets always land; an unsigned release is
-        # still loudly red rather than quietly wrong.
-        # See workspace/policies/fat-jar-release-assets.md, "Attach first, then go red".
-        id: signatures
-        run: python3 .github/report-asset-signatures.py snapshot-assets
+          path: publication-package/
+          digest-mismatch: error
+      - name: Verify transport integrity and export checked GitHub files
+        run: python3 .github/publication.py verify publication-package --export-github snapshot-assets
       - name: Update snapshot assets, source tag and notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ASSETS_COMPLETE: ${{ needs.publish-snapshot.outputs.assets_complete }}
         run: python3 .github/update-snapshot.py snapshot-assets
-      - name: Fail if anything was attached unsigned
-        # After the upload on purpose: the assets must exist even when the signature does not.
-        if: ${{ always() && steps.signatures.outputs.missing != '0' }}
-        run: |
-          echo "::error::${{ steps.signatures.outputs.missing }} asset(s) attached without a signature (-1 means none were collected at all)"
-          exit 1
 
   publish-release:
-    name: Publish Release to Central
-    needs: [check-tag, code-style, smoke-fatjar, shared-files, vmlens]
+    name: Prepare and verify signed release artifacts
+    needs:
+      - check-tag
+      - code-style
+      - smoke-fatjar
+      - shared-files
+      - vmlens
     if: needs.check-tag.result == 'success' && inputs.publish_to_central
     runs-on: ubuntu-latest
     environment: maven-central
     outputs:
-      assets_complete: ${{ steps.collect.outputs.complete }}
+      assets_complete: ${{ steps.preflight.outputs.complete }}
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         with:
           java-version-file: .java-version
           distribution: temurin
@@ -730,93 +694,115 @@ jobs:
           server-password: MAVEN_PASSWORD
           gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
           gpg-passphrase: MAVEN_GPG_PASSPHRASE
-      # Informational only (nothing depends on it): logs the effective POM with the same
-      # profile as the deploy below, so the resolved central-publishing configuration
-      # (waitUntil/waitMaxTime etc.) is visible for debugging.
       - name: Show effective POM (debug)
-        run: mvn --batch-mode --no-transfer-progress -P release help:effective-pom
-      # -Dmaven.repository.credentialScope=id: see the first deploy step of this file (Maven 3.10).
-      - name: Deploy release
-        run: mvn --batch-mode --no-transfer-progress -Dmaven.repository.credentialScope=id -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -P release deploy -DskipTests
+        run: mvn --batch-mode --no-transfer-progress -P release -DskipUpload=true help:effective-pom
+      - name: Stage release
+        run: mvn --batch-mode --no-transfer-progress -Dmaven.repository.credentialScope=id -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -P release -DskipUpload=true deploy
+          -DskipTests
         env:
-          MAVEN_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
-          MAVEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-      # Build + GPG-sign the runnable fat jar (bitcoinaddressfinder-<version>-jar-with-dependencies.jar)
-      # as a GitHub-Release asset ONLY — it is deliberately NOT deployed to Maven Central. The Deploy
-      # step above (`-P release deploy`, no `assembly`) already pushed the main/sources/javadoc jars to
-      # Central; this second invocation adds the `assembly` profile and stops at `verify` (never
-      # reaching `deploy`), so the central-publishing plugin's publish goal — bound to the deploy phase —
-      # does nothing here. `verify` runs: package (assembly `single` attaches the fat jar) → verify
-      # (maven-gpg-plugin signs every attached artifact, incl. the fat jar → .jar.asc). It rebuilds and
-      # re-signs the main/sources jars in target/ too (harmless), so the Collect step below now
-      # also finds the fat jar + its .asc. Runs only if the deploy succeeded.
-      #
-      # -Dmaven.javadoc.skip=true is REQUIRED here: this invocation shares target/ with the Deploy
-      # step above with no `mvn clean` between them. That step's own module-info-compile execution
-      # already left target/classes/module-info.class on disk, so THIS invocation's attach-javadocs
-      # would see the module descriptor and flip into JPMS module mode — before this invocation's own
-      # module-info-compile even runs, since attach-javadocs is ordered first (see CLAUDE.md "JPMS
-      # module descriptor" section). The single-invocation "javadoc before module-info-compile"
-      # ordering fix protects against a fresh compile within one invocation; it does nothing against
-      # a *prior* invocation's leftover module-info.class (2026-08-02 incident, run 30768800950:
-      # "error: No source files for package net.ladenthin.bitcoinaddressfinder.io"). Safe to skip:
-      # the Deploy step already built + signed a correct, classpath-mode javadoc jar, and this
-      # invocation never touches or re-signs it — the untouched javadoc.jar + javadoc.jar.asc from
-      # the Deploy step are what the Collect step below picks up.
-      - name: Build & sign fat jar (GitHub asset only — not deployed to Central)
+      - name: Preserve signed Central outputs before the fat jar rebuild
+        run: python3 .github/collect-release-assets.py central-assets --maven-only
+      - name: "Build & sign fat jar (GitHub asset only \u2014 not deployed to Central)"
         run: mvn --batch-mode --no-transfer-progress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -Dmaven.javadoc.skip=true -P release,assembly verify -DskipTests
         env:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-      # Runs even when the deploy step failed: a Central publish-poll timeout reds the
-      # job *after* the bundle was uploaded (and typically published server-side), while
-      # the signed jars and poms + .asc files already exist in target/ (signing happens at
-      # verify). Collecting on failure lets the github-release job still attach them.
       - name: Collect signed artifacts
         id: collect
-        if: ${{ !cancelled() }}
-        run: python3 .github/collect-release-assets.py signed-release-assets
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        if: ${{ !cancelled() }}
+        run: python3 .github/collect-release-assets.py signed-release-assets --maven-assets central-assets
+      - name: Verify and freeze the complete signed publication
+        id: preflight
+        run: python3 .github/publication.py prepare signed-release-assets publication-package
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: signed-release-assets
-          path: signed-release-assets/
+          path: publication-package/
+          if-no-files-found: error
+        if: ${{ !cancelled() && steps.preflight.outcome == 'success' }}
 
   github-release:
     name: Attach Binaries to GitHub Release
-    needs: [publish-release]
-    # Also runs when publish-release FAILED (not when skipped/cancelled): a Central
-    # publish-poll timeout reds that job after the artifacts were already uploaded —
-    # the GitHub release assets must not be lost in that case.
-    if: ${{ !cancelled() && (needs.publish-release.result == 'success' || needs.publish-release.result == 'failure') }}
+    needs:
+      - publish-release
+    if: ${{ !cancelled() && needs.publish-release.outputs.assets_complete == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: signed-release-assets
-          path: release-assets/
-      - name: Report unsigned assets (does not block the upload)
-        # Deliberately NON-blocking, and deliberately BEFORE the upload. Both attach jobs run even
-        # when their publish job failed, because a Central publish-poll timeout must not cost the
-        # GitHub assets: if Central is unreachable these are the ONLY way to get the artifacts at
-        # all. Refusing to attach on a signing failure would defeat exactly that. So annotate here,
-        # upload regardless, and fail the job afterwards. Assets always land; an unsigned release is
-        # still loudly red rather than quietly wrong.
-        # See workspace/policies/fat-jar-release-assets.md, "Attach first, then go red".
-        id: signatures
-        run: python3 .github/report-asset-signatures.py release-assets
+          path: publication-package/
+          digest-mismatch: error
+      - name: Verify transport integrity and export checked GitHub files
+        run: python3 .github/publication.py verify publication-package --export-github release-assets
       - name: Upload release assets
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64
         with:
           files: release-assets/*
-      - name: Fail if anything was attached unsigned
-        # After the upload on purpose: the assets must exist even when the signature does not.
-        if: ${{ always() && steps.signatures.outputs.missing != '0' }}
-        run: |
-          echo "::error::${{ steps.signatures.outputs.missing }} asset(s) attached without a signature (-1 means none were collected at all)"
-          exit 1
+
+
+  central-snapshot:
+    name: Upload checked snapshot artifacts to Maven Central
+    needs:
+      - publish-snapshot
+    if: ${{ !cancelled() && needs.publish-snapshot.outputs.assets_complete == 'true' }}
+    runs-on: ubuntu-latest
+    environment: maven-central
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
+        with:
+          java-version-file: .java-version
+          distribution: temurin
+          server-id: central
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: signed-snapshot-assets
+          path: publication-package/
+          digest-mismatch: error
+      - name: Transfer frozen artifacts (no rebuild, signing or validation polling)
+        run: python3 .github/publication.py upload publication-package
+        env:
+          MAVEN_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN }}
+
+  central-release:
+    name: Upload checked release artifacts to Maven Central
+    needs:
+      - publish-release
+    if: ${{ !cancelled() && needs.publish-release.outputs.assets_complete == 'true' }}
+    runs-on: ubuntu-latest
+    environment: maven-central
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
+        with:
+          java-version-file: .java-version
+          distribution: temurin
+          server-id: central
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: signed-release-assets
+          path: publication-package/
+          digest-mismatch: error
+      - name: Transfer frozen artifacts (no rebuild, signing or validation polling)
+        run: python3 .github/publication.py upload publication-package
+        env:
+          MAVEN_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN }}
