@@ -53,8 +53,13 @@ record evidence and distribution changes; they do not claim that server-side app
 been applied. Inspect exact file matches for the historical Git/proprietary findings and the
 remaining Logback EPL-1.0 finding. Historical revisions are not changed by deleting current files.
 
-The unlicensed SevenForums material in BroomCabinet needs a documented redistribution grant
-or a separate owner decision to remove it. A LicenseRef is documentation, not permission.
+BroomCabinet records the SevenForums registry files as finding `BROOM-LIC-001` in its
+`THIRD_PARTY.md`, with status unresolved. The reviewed contents are predominantly Microsoft
+Windows default configuration; no substantial independent program logic was identified.
+Whether protectable third-party contributions exist and require a redistribution grant remains
+unresolved. The files and provenance markings are retained pending assessment; no release
+blocker has been established from this finding. A LicenseRef documents provenance, not a grant
+or scanner approval. This finding concerns BroomCabinet only.
 
 ## Releasing
 
