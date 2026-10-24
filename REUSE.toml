@@ -116,26 +116,6 @@ path = [
 SPDX-FileCopyrightText = "2020 Bernard Ladenthin <bernard.ladenthin@gmail.com>"
 SPDX-License-Identifier = "MIT"
 
-# ---------------------------------------------------------------------------
-# Third-party: vanitygen / OCLExplorer unused OpenCL kernels (AGPL-3.0-or-later)
-# ---------------------------------------------------------------------------
-
-[[annotations]]
-path = [
-    "src/main/resources/unused/calc_addrs.cl",
-    "src/main/resources/unused/calc_addrs_fix_zero.cl",
-]
-SPDX-FileCopyrightText = "2011 <samr7@cs.washington.edu>"
-SPDX-License-Identifier = "AGPL-3.0-or-later"
-
-[[annotations]]
-path = "src/main/resources/unused/gpu.cl"
-SPDX-FileCopyrightText = [
-    "2011 <samr7@cs.washington.edu>",
-    "2017 Stanislav V. Tretyakov <svtrostov@yandex.ru>",
-]
-SPDX-License-Identifier = "AGPL-3.0-or-later"
-
 # The issue/PR templates are kept byte-identical in java-llama.cpp, BitcoinAddressFinder, srcmorph
 # and streambuffer (.github/shared-files.sha256) and carry the license of the other shared files.
 # Last in this file on purpose: of several matching annotations the last one applies.

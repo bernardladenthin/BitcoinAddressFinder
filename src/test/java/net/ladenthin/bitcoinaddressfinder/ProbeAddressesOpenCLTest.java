@@ -13,11 +13,9 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.google.common.io.Resources;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
-import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
@@ -228,48 +226,6 @@ public class ProbeAddressesOpenCLTest {
                 System.out.println("========================================");
             }
         }
-    }
-
-    @Test
-    @Disabled
-    public void calcAddrsFixZeroCl_loadWithoutErrors() throws IOException {
-        // ATTENTION: BLDEBUG
-
-        int ROW_SIZE = 2; // x1, y1
-        int COL_SIZE = 2; // rx, ry
-
-        String calcAddrsFixZeroClFileName = "calc_addrs.cl";
-        URL url = Resources.getResource(calcAddrsFixZeroClFileName);
-        String calcAddrsFixZeroCl = Resources.toString(url, StandardCharsets.UTF_8);
-
-        final int pointsOutInts = ACCESS_BUNDLE;
-        final int zHeapInts = ACCESS_BUNDLE;
-        final int rowInInts = ACCESS_BUNDLE * ACCESS_STRIDE * ROW_SIZE;
-        final int colInInts = ACCESS_BUNDLE * COL_SIZE;
-
-        final ClApi clApi = OpenClBinding.defaultClApi();
-        final ClPlatformId platform = clApi.getPlatformIds().get(0);
-        final ClDeviceId device =
-                clApi.getDeviceIds(platform, CL10.CL_DEVICE_TYPE_ALL).get(0);
-        final ClContext context = clApi.createContext(platform, device);
-        final ClCommandQueue commandQueue = clApi.createCommandQueue(context, device, false);
-
-        final ClMem pointsOutMem =
-                clApi.createBuffer(context, ClBufferFlags.READ_WRITE, (long) Integer.BYTES * pointsOutInts);
-        final ClMem zHeapMem = clApi.createBuffer(context, ClBufferFlags.READ_WRITE, (long) Integer.BYTES * zHeapInts);
-        final ClMem rowInMem = clApi.createBuffer(context, ClBufferFlags.READ_ONLY, (long) Integer.BYTES * rowInInts);
-        final ClMem colInMem = clApi.createBuffer(context, ClBufferFlags.READ_ONLY, (long) Integer.BYTES * colInInts);
-
-        final ClProgram program = clApi.createProgramWithSource(context, new String[] {calcAddrsFixZeroCl});
-        clApi.buildProgram(program, device, "");
-
-        final ClKernel kernelEcAddGrid = clApi.createKernel(program, "ec_add_grid");
-        clApi.setKernelArg(kernelEcAddGrid, 0, pointsOutMem);
-        clApi.setKernelArg(kernelEcAddGrid, 1, zHeapMem);
-        clApi.setKernelArg(kernelEcAddGrid, 2, rowInMem);
-        clApi.setKernelArg(kernelEcAddGrid, 3, colInMem);
-
-        clApi.enqueueNDRangeKernel(commandQueue, kernelEcAddGrid, new long[] {ACCESS_BUNDLE}, false);
     }
 
     @ParameterizedTest
