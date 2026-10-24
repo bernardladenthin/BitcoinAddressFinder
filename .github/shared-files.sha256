@@ -79,4 +79,4 @@ bf43c70a38ea1db6a92b35b8e97bb442d2fddcd5b3401919976ac139348e2a0e  .github/collec
 71ec85b7a30e80b18a9ab1fac0199cc50d68548e6f00dd116ab0f904ad63aa50  .github/release-assets.json.license
 0dabc638fcf4a505029e8718fca0d6434e66874d8029cfd9da2626003de6a5d7  docs/dependency-license-review.md
 8c7e4771f4543aebecbec1013ff091196c5abe475e1c7bc90738244d9c5a02d2  .fossa.yml?repo
-a6a4d6efe20634a62f860294b3fbd30c71d017a42fc55421ae83b8a7e8aba572  .github/collect-third-party-licenses.py
+31089ad5513d5db2e8ab3c73a3e960c105d91423b93617092c3a32f7c43d9355  .github/collect-third-party-licenses.py

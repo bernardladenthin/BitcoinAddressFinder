@@ -28,7 +28,7 @@ def legal_file(name):
     if path.suffix.lower() in {".class", ".java", ".kt", ".png", ".jpg", ".gif", ".jar"}:
         return False
     return (any(part.lower() in {"licenses", "licences"} for part in path.parts)
-            or re.fullmatch(r"(?:licen[sc]e|notice|copying)(?:[-_.].*)?", lower) is not None)
+            or re.fullmatch(r"(?:licen[sc]e|notice|copying|copyright)(?:[-_.].*)?", lower) is not None)
 
 
 def collect(classpath, output):
