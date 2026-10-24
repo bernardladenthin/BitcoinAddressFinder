@@ -3,7 +3,7 @@
 
 **AI:**  
 [![Claude](https://img.shields.io/badge/Claude-D97757?logo=claude&logoColor=fff)](#)  
-[![CodeRabbit](https://img.shields.io/badge/CodeRabbit-AI%20Reviews-FF570A)](https://coderabbit.ai/)  
+![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/bernardladenthin/BitcoinAddressFinder?utm_source=oss&utm_medium=github&utm_campaign=bernardladenthin%2FBitcoinAddressFinder&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)  
 
 **Build:**  
 ![Java 21+](https://img.shields.io/badge/Java-21%2B-informational)  
