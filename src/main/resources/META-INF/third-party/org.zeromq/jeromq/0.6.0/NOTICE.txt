@@ -1,0 +1,10 @@
+JeroMQ 0.6.0
+
+This unchanged runtime component is declared under Mozilla Public License 2.0.
+The full license is in META-INF/third-party/licenses/MPL-2.0.txt.
+Source, including the original copyright and file-level license notices:
+https://repo.maven.apache.org/maven2/org/zeromq/jeromq/0.6.0/jeromq-0.6.0-sources.jar
+Project: https://github.com/zeromq/jeromq
+
+This notice does not remove the original source-file notices or grant rights
+beyond the applicable upstream license.

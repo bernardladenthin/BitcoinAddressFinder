@@ -40,6 +40,7 @@ SPDX-License-Identifier: Apache-2.0
     </scm>
 
     <properties>
+        <license.python>python3</license.python>
         <sonar.organization>bernardladenthin</sonar.organization>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <slf4j.version>2.0.20</slf4j.version>
@@ -184,6 +185,23 @@ SPDX-License-Identifier: Apache-2.0
 
     <build>
         <resources>
+            <resource>
+                <directory>${project.basedir}/LICENSES</directory>
+                <targetPath>META-INF/third-party/licenses</targetPath>
+                <includes>
+                    <include>CC-BY-2.5.txt</include>
+                    <include>EPL-2.0.txt</include>
+                    <include>MPL-2.0.txt</include>
+                </includes>
+            </resource>
+            <resource>
+                <directory>${project.basedir}</directory>
+                <targetPath>META-INF/third-party/net.ladenthin/${project.artifactId}</targetPath>
+                <includes>
+                    <include>LICENSE</include>
+                    <include>THIRD_PARTY.md</include>
+                </includes>
+            </resource>
             <resource>
                 <directory>${basedir}/src/main/resources</directory>
             </resource>
@@ -1325,6 +1343,45 @@ SPDX-License-Identifier: Apache-2.0
             <id>assembly</id>
             <build>
                 <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-dependency-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>runtime-license-classpath</id>
+                                <phase>process-classes</phase>
+                                <goals><goal>build-classpath</goal></goals>
+                                <configuration>
+                                    <includeScope>runtime</includeScope>
+                                    <includeTypes>jar</includeTypes>
+                                    <regenerateFile>true</regenerateFile>
+                                    <outputFile>${project.build.directory}/runtime-license-classpath.txt</outputFile>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>3.6.4</version>
+                        <executions>
+                            <execution>
+                                <id>collect-runtime-licenses</id>
+                                <phase>prepare-package</phase>
+                                <goals><goal>exec</goal></goals>
+                                <configuration combine.self="override">
+                                    <executable>${license.python}</executable>
+                                    <arguments>
+                                        <argument>${project.basedir}/.github/collect-third-party-licenses.py</argument>
+                                        <argument>--classpath</argument>
+                                        <argument>${project.build.directory}/runtime-license-classpath.txt</argument>
+                                        <argument>--output</argument>
+                                        <argument>${project.build.outputDirectory}/META-INF/third-party/dependencies</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-assembly-plugin</artifactId>
