@@ -19,12 +19,8 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      # Two JDKs, as in every job that builds a whole reactor: a module with a Java floor above
-      # .java-version (java-llama.cpp's llama-ffm, Java 22) builds through maven-toolchains-plugin,
-      # and setup-java writes a toolchains.xml entry per JDK it installs; the second step keeps
-      # JAVA_HOME on .java-version. Harmless in a repository without such a module. Shared file.
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
-        with: { java-version: '25', distribution: temurin }
+      # The build JDK comes from the shared .java-version. Production and test
+      # bytecode releases remain explicitly configured in the Maven POMs.
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with: { java-version-file: .java-version, distribution: temurin }
       - uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
