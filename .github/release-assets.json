@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "files": [
+    {
+      "source": "target/bitcoinaddressfinder-{version}-jar-with-dependencies.jar"
+    }
+  ]
+}
