@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+name: Maven Dependency Submission
+on:
+  push:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  submit:
+    name: Submit Maven dependencies with the build JDK
+    runs-on: ubuntu-latest
+    # The dependency-submission API requires contents:write. This workflow runs on
+    # repository pushes, never on pull_request or pull_request_target events.
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
+        with:
+          distribution: temurin
+          java-version-file: .java-version
+          cache: maven
+      # Same action revision as GitHub's automatic Maven submission, with explicit JDK setup.
+      - uses: actions/maven-dependency-submission-action@1f666f7ac2ab7b72cd5e22eaf7f23c8a581db1db
+        with:
+          maven-args: -Denforcer.skip=true -DskipTests
