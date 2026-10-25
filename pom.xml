@@ -41,10 +41,14 @@ SPDX-License-Identifier: Apache-2.0
 
     <properties>
         <license.python>python3</license.python>
+        <!-- bernardladenthin/actions, whose license collector (actionlib.java.thirdpartylicenses) the
+             fat jar build runs: ACTIONS_DIR in CI (common/setup), else a checkout next to this
+             repository. -->
+        <ci.actions.dir>${maven.multiModuleProjectDirectory}/../actions</ci.actions.dir>
         <sonar.organization>bernardladenthin</sonar.organization>
-        <!-- The Python build checks under .github are tested by unittest in the shared-files job of
-             publish.yml; no coverage report reaches Sonar for them, so counting them would only
-             ever show 0 %. Their issues are still analysed. -->
+        <!-- No Python or other code under .github is covered by a report that reaches Sonar (the
+             shared checks run from bernardladenthin/actions), so counting it would only ever show
+             0 %. Its issues are still analysed. -->
         <sonar.coverage.exclusions>.github/**</sonar.coverage.exclusions>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <slf4j.version>2.0.20</slf4j.version>
@@ -1245,6 +1249,19 @@ SPDX-License-Identifier: Apache-2.0
 
     <profiles>
         <profile>
+            <!-- ACTIONS_DIR (exported by bernardladenthin/actions' common/setup) wins over the
+                 sibling checkout ci.actions.dir defaults to. -->
+            <id>actions-dir-from-environment</id>
+            <activation>
+                <property>
+                    <name>env.ACTIONS_DIR</name>
+                </property>
+            </activation>
+            <properties>
+                <ci.actions.dir>${env.ACTIONS_DIR}</ci.actions.dir>
+            </properties>
+        </profile>
+        <profile>
             <id>release</id>
             <build>
                 <plugins>
@@ -1383,8 +1400,14 @@ SPDX-License-Identifier: Apache-2.0
                                 <goals><goal>exec</goal></goals>
                                 <configuration combine.self="override">
                                     <executable>${license.python}</executable>
+                                    <environmentVariables>
+                                        <PYTHONPATH>${ci.actions.dir}/lib</PYTHONPATH>
+                                    </environmentVariables>
                                     <arguments>
-                                        <argument>${project.basedir}/.github/collect-third-party-licenses.py</argument>
+                                        <!-- python3 -m actionlib.java.thirdpartylicenses, but saying where actionlib was looked for
+                                             when it is missing instead of a ModuleNotFoundError. -->
+                                        <argument>-c</argument>
+                                        <argument>import importlib.util, sys; importlib.util.find_spec("actionlib") or sys.exit("The license collector comes from bernardladenthin/actions: set ACTIONS_DIR to a checkout of it, or check it out next to this repository (../actions). Looked in ${ci.actions.dir}/lib"); from actionlib.java.thirdpartylicenses import main; sys.exit(main(sys.argv[1:]))</argument>
                                         <argument>--classpath</argument>
                                         <argument>${project.build.directory}/runtime-license-classpath.txt</argument>
                                         <argument>--output</argument>

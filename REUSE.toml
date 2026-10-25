@@ -125,8 +125,8 @@ path = [
 SPDX-FileCopyrightText = "2020 Bernard Ladenthin <bernard.ladenthin@gmail.com>"
 SPDX-License-Identifier = "MIT"
 
-# The issue/PR templates are kept byte-identical in java-llama.cpp, BitcoinAddressFinder, srcmorph
-# and streambuffer (.github/shared-files.sha256) and carry the license of the other shared files.
+# The issue/PR templates are templates of bernardladenthin/actions (templates/common), checked by
+# its check-templates action, and carry the license of the other template files.
 # Last in this file on purpose: of several matching annotations the last one applies.
 [[annotations]]
 path = [
@@ -140,7 +140,7 @@ SPDX-License-Identifier = "MIT OR Apache-2.0"
 # ---------------------------------------------------------------------------
 # Third-party: upstream license texts in third-party-notices/ (see its SOURCES.tsv: source URL
 # and SHA-256 per file). The runtime ones go into the fat jar through
-# .github/collect-third-party-licenses.py --supplemental; hashcat and secp256k1 cover kernels
+# the license collector of bernardladenthin/actions (--supplemental); hashcat and secp256k1 cover kernels
 # in this project's own jar.
 # ---------------------------------------------------------------------------
 

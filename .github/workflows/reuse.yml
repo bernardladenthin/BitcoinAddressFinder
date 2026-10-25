@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+# Template of bernardladenthin/actions (templates/common); the job is its reusable workflow.
+name: REUSE Compliance Check
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    uses: bernardladenthin/actions/.github/workflows/reuse.yml@7646ab0603d75ee130463eceaa8988f7352e2d6a # v1.0.0

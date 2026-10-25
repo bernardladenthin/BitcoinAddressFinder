@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **The shared CI code moved to [bernardladenthin/actions](https://github.com/bernardladenthin/actions).**
+  The build-check library, the publication gate and its consumers, the signing-key checks and the
+  shared scripts and workflows are actions and reusable workflows there, pinned by commit; the
+  `shared-files` job and `.github/shared-files.sha256` are replaced by the `repository-checks` job,
+  configured in `.github/actions-config.json`: the files this repository must carry are compared with
+  the templates there, and the publication wiring and a dry run of the release asset contract are
+  checked in every pull request. The fat jar build (`-P assembly`) runs the license collector from there: `ACTIONS_DIR` in CI, locally a checkout at `../actions`.
 - **Releases and snapshots are published through one local gate.** The publish jobs stage and sign
   everything, `publication.py prepare` checks the exact file set, every signature and the version
   against the tag (`v<version>`, no `-SNAPSHOT`; `check-tag` / `check-snapshot` check it first), and

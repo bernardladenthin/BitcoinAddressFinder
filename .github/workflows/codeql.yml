@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+# Template of bernardladenthin/actions (templates/java); the job is its reusable workflow.
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "12 1 * * 0"
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    uses: bernardladenthin/actions/.github/workflows/java-codeql.yml@7646ab0603d75ee130463eceaa8988f7352e2d6a # v1.0.0
+    permissions:
+      actions: read
+      contents: read
+      security-events: write

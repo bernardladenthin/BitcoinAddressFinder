@@ -3,8 +3,8 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 #
 # Jobs of publish.yml that do not gate both publish jobs, each with the reason it may stay red.
-# Every other job must gate both; check-release-gate.py (shared-files job) fails on a job that does
-# not, and on a line here that names no job or a job that gates both after all.
+# Every other job must gate both; the release-gate check of bernardladenthin/actions (repository-checks
+# job) fails on a job that does not, and on a line here that names no job or a job that gates both after all.
 # Format: <job>: <reason>
 publish-snapshot: a publish job itself
 publish-release: a publish job itself
