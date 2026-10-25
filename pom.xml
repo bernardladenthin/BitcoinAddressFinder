@@ -1405,9 +1405,17 @@ SPDX-License-Identifier: Apache-2.0
                                     </environmentVariables>
                                     <arguments>
                                         <!-- python3 -m actionlib.java.thirdpartylicenses, but saying where actionlib was looked for
-                                             when it is missing instead of a ModuleNotFoundError. -->
+                                             when it is missing instead of a ModuleNotFoundError.
+                                             The Python string literals are SINGLE-quoted deliberately. On Windows
+                                             exec-maven-plugin drops a double quote out of an argument (measured with
+                                             this plugin version: print("x") reaches Python as print(x)), so the
+                                             double-quoted form makes this build fail there with a SyntaxError and
+                                             exit 1, while the Linux CI stays green and never shows it. Escaping them
+                                             as backslash-quote survives Windows but NOT Linux, where the argument
+                                             reaches execve verbatim and Python then sees the backslashes. Single
+                                             quotes are valid Python and survive both platforms. Keep them. -->
                                         <argument>-c</argument>
-                                        <argument>import importlib.util, sys; importlib.util.find_spec("actionlib") or sys.exit("The license collector comes from bernardladenthin/actions: set ACTIONS_DIR to a checkout of it, or check it out next to this repository (../actions). Looked in ${ci.actions.dir}/lib"); from actionlib.java.thirdpartylicenses import main; sys.exit(main(sys.argv[1:]))</argument>
+                                        <argument>import importlib.util, sys; importlib.util.find_spec('actionlib') or sys.exit('The license collector comes from bernardladenthin/actions: set ACTIONS_DIR to a checkout of it, or check it out next to this repository (../actions). Looked in ${ci.actions.dir}/lib'); from actionlib.java.thirdpartylicenses import main; sys.exit(main(sys.argv[1:]))</argument>
                                         <argument>--classpath</argument>
                                         <argument>${project.build.directory}/runtime-license-classpath.txt</argument>
                                         <argument>--output</argument>
