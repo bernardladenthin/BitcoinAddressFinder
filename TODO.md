@@ -11,6 +11,20 @@ so everything below is genuinely still open.
 
 ## Open — BAF-specific
 
+### Fat jar license texts — the owner's open points (from the review of 2026-10-25)
+
+`third-party-notices/` supplies the texts the bundled jars lack (`SOURCES.tsv` names each source).
+Not settled by it:
+
+- **`lwjgl-opencl`**: the Khronos headers it is generated from carry the old Khronos MIT variant;
+  whether `MIT-Khronos-old` or plain `MIT` is the right SPDX id is not confirmed.
+- **Native runtimes inside the bundled jars**: the `jffi` natives `lmdbjava` pulls in are built with
+  MinGW (Windows) and for musl (Linux); whether runtime code of those toolchains is linked in and
+  needs a notice was not reviewed.
+- **`jsr305` and `listenablefuture`**: the license comes from the POM only (no text in the jar, and
+  `listenablefuture` 9999.0 is an empty placeholder); the texts in `third-party-notices/` are the
+  POM's declared license, not a file the project ships.
+
 ### Open points from the bug hunt of 2026-10-16 … 20 (details: `BUGHUNT-FOUND.md`)
 
 Everything the bug hunt left open, so nothing is lost when the session ends. The ledger entry
