@@ -5,7 +5,8 @@
 
 The workflow serializes this entire operation with a job concurrency group. The ancestry/run
 checks also reject an older build which finishes after a newer build has already published.
-An incomplete collection changes nothing: no upload, no tag or notes update, no prune.
+An incomplete collection changes nothing: no upload, no tag or notes update, no prune. The first
+snapshot starts as a draft, so a failed first upload leaves neither a public release nor a tag.
 """
 
 import json
@@ -93,12 +94,16 @@ def publish(repository, sha, run_id, attempt, assets_dir, complete, github=None,
             f"(https://github.com/{repository}/actions/runs/{run_id}/attempts/{attempt}).\n\n"
             f"<!-- snapshot-publish {run_id} {attempt} {sha} -->")
     if not release:
-        if not ref:
-            ref = gh.api("POST", f"{repo}/git/refs", {"ref": f"refs/tags/{tag}", "sha": sha})
-        release = gh.api("POST", f"{repo}/releases", {
-            "tag_name": tag, "target_commitish": sha, "name": title,
-            "prerelease": True, "body": body
-        })
+        # The first snapshot is a draft until its upload is complete: no public release and no tag
+        # that names this build before its assets are there. A draft a failed run left behind is
+        # reused (the tag lookup above does not see drafts).
+        release = next((r for r in gh.api("GET", f"{repo}/releases?per_page=100") or []
+                        if r.get("draft") and r.get("tag_name") == tag), None)
+        if not release:
+            release = gh.api("POST", f"{repo}/releases", {
+                "tag_name": tag, "target_commitish": sha, "name": title, "prerelease": True,
+                "draft": True, "body": "Snapshot upload in progress."
+            })
     gh.command("release", "upload", tag, *files, "--repo", repository, "--clobber")
 
     if ref:
@@ -106,7 +111,7 @@ def publish(repository, sha, run_id, attempt, assets_dir, complete, github=None,
     else:
         gh.api("POST", f"{repo}/git/refs", {"ref": f"refs/tags/{tag}", "sha": sha})
     gh.api("PATCH", f"{repo}/releases/{release['id']}", {
-        "target_commitish": sha, "name": title, "prerelease": True, "body": body
+        "target_commitish": sha, "name": title, "prerelease": True, "draft": False, "body": body
     })
 
     # Read every page before deleting: deleting while paginating could skip shifted entries.

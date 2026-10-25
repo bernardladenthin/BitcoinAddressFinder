@@ -26,6 +26,7 @@ class FakeGitHub:
         self.fail_upload = False
         self.fail_deletes = set()
         self.tag = "snapshot"
+        self.drafts = []
 
     def api(self, method, endpoint, payload=None, optional=False):
         self.calls.append((method, endpoint, payload))
@@ -42,6 +43,8 @@ class FakeGitHub:
                 return {"object": {"type": "commit", "sha": OLD}}
             if "/assets?" in endpoint:
                 return self.pages[int(endpoint.split("&page=")[1])]
+            if endpoint.endswith("/releases?per_page=100"):
+                return self.drafts
         if method == "POST" and endpoint.endswith("/releases"):
             return {"id": 7}
         if method == "POST" and endpoint.endswith("/git/refs"):
@@ -153,8 +156,39 @@ class SnapshotTest(unittest.TestCase):
     def test_creates_missing_tag_and_release_once(self):
         self.gh.ref, self.gh.release = None, None
         self.assertTrue(self.publish())
-        self.assertEqual(sum(c[0] == "POST" and c[1].endswith("/git/refs") for c in self.gh.calls), 1)
-        self.assertTrue(any(c[0] == "POST" and c[1].endswith("/releases") for c in self.gh.calls))
+        calls = self.gh.calls
+        self.assertEqual(sum(c[0] == "POST" and c[1].endswith("/git/refs") for c in calls), 1)
+        created = [c[2] for c in calls if c[0] == "POST" and c[1].endswith("/releases")]
+        self.assertEqual(len(created), 1)
+        # A draft without the build's notes until the upload is complete; the tag comes after it.
+        self.assertTrue(created[0]["draft"])
+        self.assertNotIn(NEW, created[0]["body"])
+        upload = next(i for i, c in enumerate(calls) if c[0] == "upload")
+        tag = next(i for i, c in enumerate(calls) if c[0] == "POST" and c[1].endswith("/git/refs"))
+        self.assertLess(upload, tag)
+        notes = next(c[2] for c in calls if c[0] == "PATCH" and c[1].endswith("/releases/7"))
+        self.assertFalse(notes["draft"])
+        self.assertIn(NEW, notes["body"])
+
+    def test_failed_first_upload_leaves_no_tag_and_no_public_release(self):
+        self.gh.ref, self.gh.release = None, None
+        self.gh.fail_upload = True
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.publish()
+        self.assertFalse(any(c[0] in ("PATCH", "DELETE") or c[1].endswith("/git/refs")
+                             for c in self.gh.calls if c[0] != "upload"))
+        created = next(c[2] for c in self.gh.calls if c[0] == "POST" and c[1].endswith("/releases"))
+        self.assertTrue(created["draft"])
+
+    def test_a_draft_a_failed_first_upload_left_is_reused(self):
+        self.gh.ref, self.gh.release = None, None
+        self.gh.drafts = [{"id": 5, "draft": False, "tag_name": "snapshot"},
+                          {"id": 6, "draft": True, "tag_name": "other"},
+                          {"id": 8, "draft": True, "tag_name": "snapshot"}]
+        self.assertTrue(self.publish())
+        self.assertFalse(any(c[0] == "POST" and c[1].endswith("/releases") for c in self.gh.calls))
+        notes = next(c[2] for c in self.gh.calls if c[0] == "PATCH" and c[1].endswith("/releases/8"))
+        self.assertFalse(notes["draft"])
 
     def test_reads_all_asset_pages_before_deleting(self):
         self.gh.pages = {1: [{"id": i, "name": f"old-{i}.jar"} for i in range(100)],
