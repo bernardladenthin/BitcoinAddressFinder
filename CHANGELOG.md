@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **`bernardladenthin/actions` pinned at v1.0.2.** The release carries a documentation change only:
+  the license collector's `python3 -c` guard must use single-quoted Python string literals, because
+  `exec-maven-plugin` drops a double quote out of an argument on Windows. It records the trap this
+  repository's own POM just stepped out of (see the Fixed entry); the shared CI behaviour is unchanged.
 - **The shared CI code moved to [bernardladenthin/actions](https://github.com/bernardladenthin/actions).**
   The build-check library, the publication gate and its consumers, the signing-key checks and the
   shared scripts and workflows are actions and reusable workflows there, pinned by commit; the
