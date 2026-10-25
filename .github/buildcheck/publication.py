@@ -315,6 +315,10 @@ def upload(package, *, skip_superseded=False, github=None):
         with tempfile.TemporaryDirectory(prefix="snapshot-transfer-") as tmp:
             pom = Path(tmp) / "pom.xml"
             snapshot_pom(package, pom)
+            # credentialScope=id: Maven 3.10 sends a server's credentials only to its declared
+            # origins, which for the id `central` is repo.maven.apache.org, so the upload to
+            # central.sonatype.com would go out anonymously (HTTP 401). This is the only upload by
+            # Maven; the staging deploys run with -DskipUpload=true and need no credentials.
             subprocess.run(["mvn", "-B", "--no-transfer-progress", "-Dmaven.repository.credentialScope=id",
                             "-f", str(pom), "validate"], check=True)
         return

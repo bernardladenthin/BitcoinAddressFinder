@@ -638,7 +638,7 @@ jobs:
       - name: Show effective POM (debug)
         run: mvn --batch-mode --no-transfer-progress -P release -DskipUpload=true help:effective-pom
       - name: Stage snapshot
-        run: mvn --batch-mode --no-transfer-progress -Dmaven.repository.credentialScope=id -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -P release -DskipUpload=true deploy
+        run: mvn --batch-mode --no-transfer-progress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -P release -DskipUpload=true deploy
           -DskipTests
         env:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
@@ -713,7 +713,7 @@ jobs:
       - name: Show effective POM (debug)
         run: mvn --batch-mode --no-transfer-progress -P release -DskipUpload=true help:effective-pom
       - name: Stage release
-        run: mvn --batch-mode --no-transfer-progress -Dmaven.repository.credentialScope=id -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -P release -DskipUpload=true deploy
+        run: mvn --batch-mode --no-transfer-progress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -P release -DskipUpload=true deploy
           -DskipTests
         env:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}

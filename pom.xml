@@ -198,6 +198,16 @@ SPDX-License-Identifier: Apache-2.0
                     <include>MPL-2.0.txt</include>
                 </includes>
             </resource>
+            <!-- The OpenCL kernels in this jar come from hashcat and port libsecp256k1 code (MIT,
+                 see REUSE.toml); their license texts and the credits file the kernel headers name. -->
+            <resource>
+                <directory>${project.basedir}/third-party-notices</directory>
+                <targetPath>META-INF/third-party/net.ladenthin/${project.artifactId}/embedded</targetPath>
+                <includes>
+                    <include>hashcat-2d71af37/**</include>
+                    <include>secp256k1-v0.8.0/**</include>
+                </includes>
+            </resource>
             <resource>
                 <directory>${project.basedir}</directory>
                 <targetPath>META-INF/third-party/net.ladenthin/${project.artifactId}</targetPath>
@@ -800,9 +810,9 @@ SPDX-License-Identifier: Apache-2.0
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-assembly-plugin</artifactId>
                 <configuration>
-                    <descriptorRefs>
-                        <descriptorRef>jar-with-dependencies</descriptorRef>
-                    </descriptorRefs>
+                    <descriptors>
+                        <descriptor>src/assembly/fat-jar.xml</descriptor>
+                    </descriptors>
                     <archive>
                         <manifest>
                             <mainClass>net.ladenthin.bitcoinaddressfinder.cli.Main</mainClass>
@@ -1378,7 +1388,13 @@ SPDX-License-Identifier: Apache-2.0
                                         <argument>--classpath</argument>
                                         <argument>${project.build.directory}/runtime-license-classpath.txt</argument>
                                         <argument>--output</argument>
-                                        <argument>${project.build.outputDirectory}/META-INF/third-party/dependencies</argument>
+                                        <argument>${project.build.directory}/third-party-dependencies</argument>
+                                        <!-- License texts for runtime JARs that carry none
+                                             (third-party-notices/notices.json); a JAR with neither
+                                             fails the build. -->
+                                        <argument>--supplemental</argument>
+                                        <argument>${project.basedir}/third-party-notices</argument>
+                                        <argument>--require-complete</argument>
                                     </arguments>
                                 </configuration>
                             </execution>

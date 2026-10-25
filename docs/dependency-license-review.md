@@ -65,6 +65,10 @@ copied legal entries with the original JAR bytes. The collector reads the resolv
 classpath, preserves classifiers and distinguishes equal filenames by content hash.
 It never treats a `LICENSE.class` bytecode file as a text license. BAF's assembly profile and
 the srcmorph CLI run it before packaging; Python 3.8+ is needed on that build host.
-JARs with no legal entries remain explicitly listed. No network requests or approvals are made.
-Missing legal material must be supplied explicitly. This check does not replace
-source-availability obligations or the review of native third-party components.
+No network requests or approvals are made. A JAR with no legal entries of its own gets the
+upstream texts the repository commits for it (`--supplemental third-party-notices`: `notices.json`
+maps JAR base names to folders, `SOURCES.tsv` records each text's source URL and SHA-256; listed as
+`supplemental_files` in the inventory), and `--require-complete` fails the build when a runtime JAR
+has neither. This check does not replace source-availability obligations. java-llama.cpp's natives
+jars carry the texts of the code compiled into them (`llama/legal/natives/`, `NOTICE.md` is the
+index), so a fat jar bundling them needs no supplement for them.

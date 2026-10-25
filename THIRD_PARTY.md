@@ -28,6 +28,9 @@ Runnable BAF/srcmorph CLI packaging uses Python 3.8+ to collect original depende
 legal files before the project JAR and fat JAR are assembled. Override `-Dlicense.python=python`
 if that is the Python command on the build host. Legal files are under
 `META-INF/third-party/dependencies/<original-jar-name>-<content-hash>/`.
-`inventory.json` maps exact JAR hashes/classifiers to preserved files and also lists JARs
-without embedded legal material, which require review or supplemental notices.
+`inventory.json` maps exact JAR hashes/classifiers to preserved files. A JAR without embedded
+legal material gets the upstream texts from `third-party-notices/` (`notices.json`; source URL and
+SHA-256 of every text in `SOURCES.tsv`), listed as `supplemental_files`; a JAR with neither fails
+the build. The OpenCL kernels from hashcat (MIT, with libsecp256k1 ports, MIT) carry their texts
+in the jar under `META-INF/third-party/net.ladenthin/bitcoinaddressfinder/embedded/`.
 This source-location statement does not clear unknown proprietary or historical Git findings.

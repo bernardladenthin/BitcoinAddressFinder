@@ -2333,8 +2333,12 @@ BitcoinAddressFinder stands on the shoulders of excellent open-source work. In p
 - **[bitcoinj/secp256k1-jdk](https://github.com/bitcoinj/secp256k1-jdk)** — secp256k1 bindings for
   the JVM; a reference for the Java-side secp256k1 surface.
 
-See the bundled third-party licenses for full attribution; some subprojects are under their own
-licenses (e.g. the `copyfromhashcat` kernels are MIT).
+The jar carries the license texts of the code it contains under `META-INF/third-party/`: the
+`copyfromhashcat` kernels (MIT, hashcat, with ports of libsecp256k1, MIT) under
+`net.ladenthin/bitcoinaddressfinder/embedded/`, and the fat jar additionally every runtime
+dependency's own legal files or, where a jar carries none, the upstream texts from
+[`third-party-notices/`](third-party-notices/) (`dependencies/inventory.json` says which applies to
+which jar). The build fails when a runtime dependency has neither.
 
 
 ## Legal
