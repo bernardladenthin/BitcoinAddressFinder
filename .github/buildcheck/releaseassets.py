@@ -173,9 +173,10 @@ def collect(root, destination, config_path=None, *, maven_only=False, maven_asse
         raise ValueError(f"asset destination must be empty: {destination}")
     for source, name in expected:
         for suffix in ("", ".asc"):
-            path = Path(str(source) + suffix)
+            path = Path(str(source) + suffix).resolve()
             if not path.is_file() or path.stat().st_size == 0:
-                errors.append(f"missing or empty release output: {path}")
+                shown = path.relative_to(root) if path.is_relative_to(root) else path
+                errors.append(f"missing or empty release output: {shown.as_posix()}")
                 continue
             shutil.copyfile(path, destination / (name + suffix))
     return errors

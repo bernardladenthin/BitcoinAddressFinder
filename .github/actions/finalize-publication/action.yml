@@ -35,7 +35,7 @@ runs:
       shell: bash
       env:
         CHANNEL: ${{ inputs.channel }}
-      run: python3 .github/publication.py prepare "signed-${CHANNEL}-assets" publication-package
+      run: python3 .github/publication.py prepare "signed-${CHANNEL}-assets" publication-package --channel "$CHANNEL"
     - name: Secure the checked publication package
       id: handoff
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7

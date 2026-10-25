@@ -481,8 +481,11 @@ jobs:
   # jar — the closest analogue to what jllama's smoke checks — with no network and no GPU. It is
   # deliberately a plain `java -jar`: examples/run_AddressFilesToLMDB.sh passes a long
   # --add-opens/--add-exports list for lmdbjava's internal-JDK reflection, but the import runs
-  # clean without it on JDK 21, and the contract under test is that the published artifact runs
-  # as-is. Keep this job on the OpenCL-free runner: it must not depend on an ICD being installed.
+  # clean without it, and the contract under test is that the published artifact runs as-is. It
+  # runs twice: on the build JDK of .java-version, and on Java 21, the floor the jar is compiled
+  # for (release 21) and the only run of anything on that floor, since every other job builds and
+  # tests on .java-version. Keep this job on the OpenCL-free runner: it must not depend on an ICD
+  # being installed.
   # ---------------------------------------------------------------------------
 
   smoke-fatjar:
@@ -512,6 +515,17 @@ jobs:
         run: |
           .github/smoke-fatjar-cli.sh fatjar 'bitcoinaddressfinder-*-jar-with-dependencies.jar' \
             examples 'Main#run end\.' config_AddressFilesToLMDB.json
+      - name: Install Java 21, the floor of the published jar
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
+        with:
+          java-version: '21'
+          distribution: temurin
+      - name: Run the same fat jar on Java 21
+        run: |
+          java -version
+          rm -rf examples/lmdb   # the import starts from a fresh database, as in the first run
+          .github/smoke-fatjar-cli.sh fatjar 'bitcoinaddressfinder-*-jar-with-dependencies.jar' \
+            examples 'Main#run end\.' config_AddressFilesToLMDB.json
       - name: Upload smoke logs
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
@@ -527,24 +541,19 @@ jobs:
     needs: [test, test-opencl]
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with:
-          java-version-file: .java-version
-          distribution: temurin
+          persist-credentials: false
       # Prefer coverage from the pocl job: it runs ALL tests including @OpenCLTest
       # (the ubuntu `test` matrix skips those because no ICD is installed there,
       # so its jacoco-report shows 0% for the entire OpenCL pipeline).
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with: { name: jacoco-report-opencl, path: target/site/jacoco/ }
         continue-on-error: true
-      # Submits the dependency graph to GitHub. Informational: it says nothing about whether the
-      # artifacts are correct, but it sits in the `report` job, which the release path needs -- so
-      # without this flag a third-party action having a bad day can block a publish.
-      - uses: advanced-security/maven-dependency-submission-action@a64327a7329c9939cf675e458452febe1894a70c # v6
-        continue-on-error: true
+      # The dependency graph is submitted by dependency-submission.yml (on pushes to main, with the
+      # JDK of .java-version), not here: this job gates the release path and needs no write access.
       - name: Coveralls
         uses: coverallsapp/github-action@8d6379e14d29928660c4ba802d8e85393440b329 # v2
         with:
@@ -567,8 +576,15 @@ jobs:
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       (github.event_name == 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/v'))
     steps:
-      - name: Confirm snapshot ref
-        run: echo "Confirmed on snapshot ref ${{ github.ref }}"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      # Every project version ends in -SNAPSHOT before anything is published to the snapshot channel.
+      # Only then: a push publishes nothing, and main carries the release version for the commit
+      # a release is tagged on.
+      - name: Require a SNAPSHOT version
+        if: inputs.publish_to_central
+        run: python3 .github/publication.py check-ref --channel snapshot
 
   check-tag:
     name: "Check: v* tag"
@@ -576,8 +592,12 @@ jobs:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
-      - name: Confirm tag ref
-        run: echo "Confirmed on tag ${{ github.ref }}"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      # The tag names exactly the project version (v1.2.3 for 1.2.3), which is no SNAPSHOT.
+      - name: Require the release version the tag names
+        run: python3 .github/publication.py check-ref --channel release
 
   publish-snapshot:
     name: Prepare and verify signed snapshot artifacts
@@ -595,8 +615,8 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with:
           java-version-file: .java-version
           distribution: temurin
@@ -647,10 +667,10 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: signed-snapshot-assets
           path: publication-package/
@@ -679,8 +699,8 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with:
           java-version-file: .java-version
           distribution: temurin
@@ -719,10 +739,10 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: signed-release-assets
           path: publication-package/
@@ -730,7 +750,7 @@ jobs:
       - name: Verify transport integrity and export checked GitHub files
         run: python3 .github/publication.py verify publication-package --export-github release-assets
       - name: Upload release assets
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
         with:
           files: release-assets/*
 
@@ -742,27 +762,33 @@ jobs:
     if: ${{ !cancelled() && needs.publish-snapshot.outputs.assets_complete == 'true' }}
     runs-on: ubuntu-latest
     environment: maven-central
+    # One transfer at a time; an older commit finishing late is skipped (publication.py superseded).
+    concurrency:
+      group: central-snapshot-${{ github.repository }}
+      cancel-in-progress: false
     permissions:
       contents: read
+      actions: read
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with:
           java-version-file: .java-version
           distribution: temurin
           server-id: central
           server-username: MAVEN_USERNAME
           server-password: MAVEN_PASSWORD
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: signed-snapshot-assets
           path: publication-package/
           digest-mismatch: error
       - name: Transfer frozen artifacts (no rebuild, signing or validation polling)
-        run: python3 .github/publication.py upload publication-package
+        run: python3 .github/publication.py upload publication-package --skip-superseded
         env:
+          GH_TOKEN: ${{ github.token }}
           MAVEN_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN }}
 
@@ -776,17 +802,17 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with:
           java-version-file: .java-version
           distribution: temurin
           server-id: central
           server-username: MAVEN_USERNAME
           server-password: MAVEN_PASSWORD
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: signed-release-assets
           path: publication-package/
@@ -808,10 +834,10 @@ jobs:
       id-token: write
       attestations: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: signed-snapshot-assets
           path: publication-package/
@@ -819,7 +845,7 @@ jobs:
       - name: Verify the secured package before attesting
         run: python3 .github/publication.py verify publication-package
       - name: Attest the frozen artifacts and detached signatures
-        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
         with:
           subject-path: publication-package/github/*
 
@@ -835,10 +861,10 @@ jobs:
       id-token: write
       attestations: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: signed-release-assets
           path: publication-package/
@@ -846,6 +872,6 @@ jobs:
       - name: Verify the secured package before attesting
         run: python3 .github/publication.py verify publication-package
       - name: Attest the frozen artifacts and detached signatures
-        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
         with:
           subject-path: publication-package/github/*

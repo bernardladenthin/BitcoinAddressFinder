@@ -3,7 +3,10 @@
 
 name: Maven Dependency Submission
 on:
+  # The graph GitHub shows is the default branch's. Other branches (Dependabot's among them, whose
+  # pushes get a read-only token) would only fail or add snapshots nobody reads.
   push:
+    branches: [ main ]
   workflow_dispatch:
 permissions:
   contents: read

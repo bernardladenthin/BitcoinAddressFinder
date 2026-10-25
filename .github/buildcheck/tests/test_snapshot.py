@@ -83,17 +83,31 @@ class SnapshotTest(unittest.TestCase):
         deletes = [c[1] for c in calls if c[0] == "DELETE"]
         self.assertEqual(deletes, ["repos/owner/repo/releases/assets/1"])
 
-    def test_incomplete_collection_uploads_available_files_without_promoting_or_pruning(self):
-        with self.assertRaisesRegex(ValueError, "collection is incomplete"):
+    def test_incomplete_collection_changes_nothing(self):
+        with self.assertRaisesRegex(ValueError, "incomplete collection"):
             self.publish(complete=False)
-        self.assertTrue(any(c[0] == "upload" for c in self.gh.calls))
-        self.assertFalse(any(c[0] in ("PATCH", "DELETE") for c in self.gh.calls))
+        self.assertEqual(self.gh.calls, [])
 
-    def test_missing_signature_also_prevents_promotion(self):
+    def test_missing_signature_also_changes_nothing(self):
         (self.assets / "new.json.asc").unlink()
-        with self.assertRaisesRegex(ValueError, "collection is incomplete"):
+        with self.assertRaisesRegex(ValueError, "incomplete collection.*unsigned: new.json"):
             self.publish()
-        self.assertFalse(any(c[0] == "PATCH" for c in self.gh.calls))
+        self.assertEqual(self.gh.calls, [])
+
+    def test_versioned_release_tag_is_never_a_rolling_snapshot(self):
+        for tag in ("v1.2.3", "v2"):
+            with self.subTest(tag=tag):
+                with self.assertRaisesRegex(ValueError, "versioned release"):
+                    self.publish(tag=tag)
+                self.assertEqual(self.gh.calls, [])
+
+    def test_names_github_would_rename_are_refused_before_any_change(self):
+        # GitHub would upload "a b.jar" as "a.b.jar", and the prune would then delete it.
+        for name in ("a b.jar", "a b.jar.asc"):
+            (self.assets / name).write_text("artifact")
+        with self.assertRaisesRegex(ValueError, "rename release assets: a b.jar"):
+            self.publish()
+        self.assertEqual(self.gh.calls, [])
 
     def test_late_finishing_older_commit_cannot_overwrite_newer_snapshot(self):
         self.gh.comparison = "behind"
@@ -106,9 +120,9 @@ class SnapshotTest(unittest.TestCase):
                 (self.assets / "new.json.asc").write_text("signature")
                 (self.assets / name).write_text(content)
                 self.gh.calls.clear()
-                with self.assertRaisesRegex(ValueError, "collection is incomplete"):
+                with self.assertRaisesRegex(ValueError, "incomplete collection"):
                     self.publish()
-                self.assertFalse(any(c[0] in ("PATCH", "DELETE") for c in self.gh.calls))
+                self.assertEqual(self.gh.calls, [])
 
     def test_rolling_tag_and_title_are_parameters(self):
         self.gh.tag = "nightly"
@@ -204,8 +218,7 @@ class SnapshotTest(unittest.TestCase):
 
     def test_release_upload_jobs_do_not_persist_checkout_credentials(self):
         jobs = workflow.parse((Path(REPO) / ".github/workflows/publish.yml").read_text())
-        versioned = "github-release" if "github-release" in jobs else "github-release-signed"
-        for name in ("github-snapshot", versioned):
+        for name in ("github-snapshot", "github-release"):
             checkouts = [step for step in jobs[name].steps()
                          if any("uses: actions/checkout@" in line for line in step)]
             self.assertTrue(checkouts, name)

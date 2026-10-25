@@ -53,7 +53,6 @@ import org.apache.commons.io.FileUtils;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.crypto.ECKey;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -183,49 +182,6 @@ public class ProbeAddressesOpenCLTest {
         }
 
         assertThat(passed, is(equalTo(Boolean.TRUE)));
-    }
-
-    public static int BN_NBITS = 256;
-    public static int BN_WSHIFT = 5;
-    public static int BN_WBITS = (1 << BN_WSHIFT);
-    public static int BN_NWORDS = ((BN_NBITS / 8) / 4); // 4 == sizeof(bn_word)
-
-    public static int ACCESS_BUNDLE = 1024;
-    public static int ACCESS_STRIDE = (ACCESS_BUNDLE / BN_NWORDS);
-
-    @Test
-    @Disabled
-    public void reverseEngineering_startPoints() {
-        int GLOBAL_SIZE = 1024;
-        for (int j = 0; j < 1024; j++) {
-            for (int k = 0; k < 64; k++) {
-                int i, cell, start;
-                System.out.println("========================================");
-                /* Load the row increment point */
-                i = 2 * j;
-                System.out.println("i: " + i);
-
-                cell = i;
-                System.out.println("cell: " + cell);
-                start = ((((2 * cell) / ACCESS_STRIDE) * ACCESS_BUNDLE) + (cell % (ACCESS_STRIDE / 2)));
-                System.out.println("start: " + start);
-
-                int row_in_access_1 = start + (i * ACCESS_STRIDE);
-                System.out.println("row_in_access_1: " + row_in_access_1);
-
-                start += (ACCESS_STRIDE / 2);
-                System.out.println("start: " + start);
-
-                int row_in_access_2 = start + (i * ACCESS_STRIDE);
-                System.out.println("row_in_access_2: " + row_in_access_2);
-
-                cell += (k * GLOBAL_SIZE);
-                System.out.println("cell: " + cell);
-                start = (((cell / ACCESS_STRIDE) * ACCESS_BUNDLE) + (cell % ACCESS_STRIDE));
-                System.out.println("start: " + start);
-                System.out.println("========================================");
-            }
-        }
     }
 
     @ParameterizedTest

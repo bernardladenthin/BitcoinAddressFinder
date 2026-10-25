@@ -5,8 +5,7 @@
 
 The workflow serializes this entire operation with a job concurrency group. The ancestry/run
 checks also reject an older build which finishes after a newer build has already published.
-Available artifacts are uploaded even after an incomplete collection; only complete uploads
-advance the source tag/notes and prune obsolete assets.
+An incomplete collection changes nothing: no upload, no tag or notes update, no prune.
 """
 
 import json
@@ -15,6 +14,9 @@ import subprocess
 from pathlib import Path
 
 from .releaseassets import signature_gaps
+
+# GitHub renames release assets with other characters; a renamed asset would be pruned as obsolete.
+ASSET_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 
 
 class GitHub:
@@ -41,6 +43,8 @@ def publish(repository, sha, run_id, attempt, assets_dir, complete, github=None,
         raise ValueError("invalid repository or published commit")
     if not re.fullmatch(r"[\w][\w.-]*", tag) or ".." in tag or tag.endswith((".", ".lock")):
         raise ValueError("invalid rolling release tag")
+    if re.match(r"v\d", tag):
+        raise ValueError("a versioned release is never a rolling snapshot: " + tag)
     run_id, attempt = int(run_id), int(attempt)
     if run_id < 1 or attempt < 1:
         raise ValueError("run ID and attempt must be positive")
@@ -51,7 +55,13 @@ def publish(repository, sha, run_id, attempt, assets_dir, complete, github=None,
     if not artifacts:
         raise ValueError("refusing to update snapshot with signatures but no artifacts")
     names = {path.name for path in files}
-    complete = complete and signature_gaps(assets_dir)[0] == 0
+    renamed = sorted(name for name in names if not ASSET_NAME.fullmatch(name))
+    if renamed:
+        raise ValueError("GitHub would rename release assets: " + ", ".join(renamed))
+    missing, errors = signature_gaps(assets_dir)
+    if not complete or missing:
+        raise ValueError("refusing to update snapshot from an incomplete collection; existing "
+                         "snapshot metadata and assets were retained" + "".join("; " + e for e in errors))
     gh = github or GitHub()
     repo = f"repos/{repository}"
     ref = gh.api("GET", f"{repo}/git/ref/tags/{tag}", optional=True)
@@ -87,12 +97,9 @@ def publish(repository, sha, run_id, attempt, assets_dir, complete, github=None,
             ref = gh.api("POST", f"{repo}/git/refs", {"ref": f"refs/tags/{tag}", "sha": sha})
         release = gh.api("POST", f"{repo}/releases", {
             "tag_name": tag, "target_commitish": sha, "name": title,
-            "prerelease": True, "body": body if complete else body + "\n\nIncomplete artifact collection."
+            "prerelease": True, "body": body
         })
     gh.command("release", "upload", tag, *files, "--repo", repository, "--clobber")
-    if not complete:
-        raise ValueError("available files uploaded, but collection is incomplete; "
-                         "existing snapshot metadata and assets were retained")
 
     if ref:
         gh.api("PATCH", f"{repo}/git/refs/tags/{tag}", {"sha": sha, "force": True})

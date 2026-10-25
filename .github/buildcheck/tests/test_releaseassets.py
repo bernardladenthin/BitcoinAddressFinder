@@ -269,7 +269,7 @@ class ReleaseAssetsTest(unittest.TestCase):
             self.assertTrue((destination / f"app-{VERSION}.jar").is_file())
 
 
-class SignatureReportTest(unittest.TestCase):
+class SignatureGapsTest(unittest.TestCase):
     def test_all_file_types_spaces_empty_orphan_and_missing_signatures(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -283,20 +283,6 @@ class SignatureReportTest(unittest.TestCase):
             (root / "orphan.jar.asc").write_text("signature")
             (root / "file.jar").write_text("")
             self.assertEqual(signature_gaps(root)[0], 4)
-
-    def test_cli_always_returns_zero_and_writes_missing_for_post_upload_assertion(self):
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            assets = root / "assets"
-            assets.mkdir()
-            (assets / "unsigned.json").write_text("bom")
-            output = root / "github-output"
-            result = subprocess.run([sys.executable, str(Path(REPO) / ".github/report-asset-signatures.py"),
-                                     str(assets)], env={**os.environ, "GITHUB_OUTPUT": str(output)},
-                                    capture_output=True, text=True)
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("::error::unsigned", result.stdout)
-            self.assertEqual(output.read_text(), "missing=1\n")
 
 
 if __name__ == "__main__":

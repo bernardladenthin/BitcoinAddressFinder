@@ -748,15 +748,24 @@ split), attached with a detached GPG `.asc`. The publish jobs build + sign it of
 second `mvn -P release,assembly verify` (which stops before `deploy`, so `central-publishing` never
 uploads it). The cross-repo convention + per-repo shapes are documented in
 [`../workspace/policies/fat-jar-release-assets.md`](../workspace/policies/fat-jar-release-assets.md).
-Release collection, signature reporting and rolling-snapshot updates use the byte-identical
-`collect-release-assets.py`, `report-asset-signatures.py`, `update-snapshot.py` and their buildcheck
-library/tests, all listed in `.github/shared-files.sha256`. Repository-specific extras live in
-`.github/release-assets.json`; Maven modules are discovered from POMs. Missing artifacts/signatures
-fail collection while preserving available files for upload. The whole `github-snapshot` job is
-shared across all four Java repos and serializes upload, source-tag/notes updates and pruning;
-only complete signed uploads advance/prune the snapshot. Versioned releases are never pruned.
-The `github-release` job remains shared across the three Maven-only repos. Interface, staging
-options and synchronization rules: [`../workspace/policies/release-asset-scripts.md`](../workspace/policies/release-asset-scripts.md).
+Every publication goes through one gate, shared byte for byte by the four Java repositories
+(listed in `.github/shared-files.sha256`; the full text is
+[`docs/publication-preflight.md`](docs/publication-preflight.md)). `check-snapshot` / `check-tag`
+run `publication.py check-ref`: a release publishes only from the tag `v<version>` of a
+non-SNAPSHOT version, a snapshot only a `-SNAPSHOT` version and never from a tag. The publish jobs
+stage and sign the Central files locally (`-DskipUpload=true deploy`) and end in the composite
+action `finalize-publication`: `collect-release-assets.py` collects what `.github/release-assets.json`
+names (Maven modules are discovered from the POMs), and `publication.py prepare` checks it -- exact
+membership, every signature with `gpg --verify`, each Central file byte-equal to its GitHub twin --
+and freezes it into one package. Only after that package is uploaded does the job output
+`assets_complete=true`; a missing file or signature fails there, and nothing is published. Three
+pairs of consumers each need only that output, never each other: `github-snapshot` /
+`github-release` attach the frozen GitHub files (`update-snapshot.py` serializes the rolling
+`snapshot` pre-release, never lets an older commit or run replace a newer one and prunes what the
+upload did not contain; a versioned tag is refused), `central-snapshot` / `central-release`
+transfer the frozen Central files (`publication.py upload`, no rebuild, no re-signing), and
+`attest-snapshot` / `attest-release` attest them. Interface, staging options and synchronization
+rules: [`../workspace/policies/release-asset-scripts.md`](../workspace/policies/release-asset-scripts.md).
 
 **BAF-specific smoke.** The cross-repo rule "no release asset is attached that CI has not run" is
 implemented here by the `smoke-fatjar` job (`needs: [build]`, gates both publish jobs): it downloads
@@ -767,8 +776,10 @@ config imports the bundled sample address files into a fresh LMDB under `example
 exercises the **lmdbjava native library out of the fat jar** — the BAF analogue of what jllama's
 smoke checks. Two BAF-specific notes: it is deliberately a plain `java -jar` even though
 `examples/run_AddressFilesToLMDB.sh` passes the long `--add-opens`/`--add-exports` list (the import
-runs clean without it on JDK 21, and the contract under test is that the published artifact runs
-as-is), and the job must stay on the **OpenCL-free** `ubuntu-latest` runner — it must never come to
+runs clean without it, and the contract under test is that the published artifact runs as-is). It
+runs the jar twice, on the build JDK of `.java-version` and on **Java 21**, the release the jar is
+compiled for: since the shared `.java-version` moved to 25, this is the only job that runs anything
+on BAF's Java 21 floor. And the job must stay on the **OpenCL-free** `ubuntu-latest` runner — it must never come to
 depend on an ICD being installed.
 
 ## Dependency Convergence Pinning
@@ -783,8 +794,10 @@ gotcha, and merge-discipline guidance are in
 Files kept byte-identical with java-llama.cpp, BitcoinAddressFinder, srcmorph and streambuffer are
 listed with their SHA-256 in **`.github/shared-files.sha256`** — the reference for what must stay
 equal. An entry `.github/workflows/publish.yml#<job>` stands for one job of the workflow: the jobs kept
-identical across the repositories (`startgate`, `shared-files`, `verify-signing-key`, `check-snapshot`,
-`check-tag`, `verify-signing-key-gradle`, `github-snapshot`, `github-release`) are checked like files. An entry ending in `?repo` covers a file or job identical up to the
+identical across the four repositories (`startgate`, `shared-files`, `verify-signing-key`,
+`verify-signing-key-gradle`, `check-snapshot`, `check-tag`, and the publication consumers
+`github-snapshot`, `github-release`, `central-snapshot`, `central-release`, `attest-snapshot`,
+`attest-release`) are checked like files. An entry ending in `?repo` covers a file or job identical up to the
 repository's name (hashed with the name replaced by `{repo}`), e.g. `SUPPORT.md?repo`.
 The `shared-files` job of `publish.yml` (gating both publish jobs) fails when a listed file changed here alone and warns when another repository's
 default branch lists it with a different hash. To change a shared file, change every copy, then run
