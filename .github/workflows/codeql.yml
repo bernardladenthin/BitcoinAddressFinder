@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   analyze:
-    uses: bernardladenthin/actions/.github/workflows/java-codeql.yml@7646ab0603d75ee130463eceaa8988f7352e2d6a # v1.0.0
+    uses: bernardladenthin/actions/.github/workflows/java-codeql.yml@df774809fbe99a5adc7b1243d053692cd840fe05 # v1.0.1
     permissions:
       actions: read
       contents: read
