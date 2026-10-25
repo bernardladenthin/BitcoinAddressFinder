@@ -62,84 +62,56 @@ jobs:
       - run: echo "Start gate elapsed — proceeding with pipeline."
 
   # ---------------------------------------------------------------------------
-  # Files kept byte-identical with the sibling repositories (java-llama.cpp,
-  # BitcoinAddressFinder, srcmorph, streambuffer), listed in .github/shared-files.sha256.
-  # A copy changed here alone fails; one the siblings list with another hash warns.
-  # Also runs the tests of the shared build checks and the release-gate check. This
-  # job is itself identical in all four repositories.
+  # The repository checks of bernardladenthin/actions, configured in
+  # .github/actions-config.json: the files this repository keeps equal to the templates
+  # there (replaced the shared-files.sha256 manifest), the release gate, bash -n over
+  # every run script, Maven version drift against the sibling repositories (warnings
+  # only), and the publication wiring plus a dry run of the release asset contract.
   # ---------------------------------------------------------------------------
-  shared-files:
-    name: Shared files + build checks
+  repository-checks:
+    name: Repository checks
     needs: startgate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - name: Shared files match .github/shared-files.sha256 (siblings compared, warnings only)
-        run: python3 .github/check-shared-files.py
-      - name: Build-check tests
-        run: python3 -m unittest discover -s .github/buildcheck/tests -t .github
+      - name: Files equal their templates in bernardladenthin/actions
+        uses: bernardladenthin/actions/common/check-templates@7646ab0603d75ee130463eceaa8988f7352e2d6a # v1.0.0
       - name: Release gate (every job gates both publish jobs, or release-gate-exemptions.txt says why)
-        run: python3 .github/check-release-gate.py
+        uses: bernardladenthin/actions/common/check-release-gate@7646ab0603d75ee130463eceaa8988f7352e2d6a # v1.0.0
       - name: Run scripts parse (bash -n over every bash run script of the workflows and actions)
-        run: python3 .github/check-run-scripts.py
+        uses: bernardladenthin/actions/common/check-run-scripts@7646ab0603d75ee130463eceaa8988f7352e2d6a # v1.0.0
       - name: Maven versions (warns where a dependency or plugin differs from a sibling repository)
-        run: python3 .github/check-versions.py
+        uses: bernardladenthin/actions/java/check-maven-versions@7646ab0603d75ee130463eceaa8988f7352e2d6a # v1.0.0
+      - name: Publication wiring and release asset contract (dry run)
+        uses: bernardladenthin/actions/java/check-publication@7646ab0603d75ee130463eceaa8988f7352e2d6a # v1.0.0
 
   # ---------------------------------------------------------------------------
-  # GPG signing-key preflight (standalone, no `needs:` — runs in parallel at the
-  # very start on every trigger). Reproduces what maven-gpg-plugin does at deploy
-  # time so a bad/expired key or wrong passphrase is caught in ~20s instead of
-  # failing the publish stage. Declares `environment: maven-central` so it reads
-  # the SAME GPG_PRIVATE_KEY / GPG_PASSPHRASE secret the publish jobs use.
-  #
-  # It is EXPECTED to go RED on refs where the secret is not delivered — fork PRs
-  # and other contributors' branches (secrets are withheld there). That red is
-  # the intended signal: "this ref cannot sign a release", not a regression.
-  #
-  # SECURITY: this job NEVER prints secret material. It imports the key into an
-  # ephemeral keyring, prints only PUBLIC key metadata (key id, fingerprint,
-  # owner UID, algorithm, created/expiry — all of which live on public
-  # keyservers), and validates the passphrase by producing + verifying a
-  # throwaway signature. The passphrase is passed on fd 3 (never argv, never a
-  # log line), `set -x` is deliberately never enabled, and the passphrase is
-  # additionally `::add-mask::`ed.
+  # GPG signing-key preflight (standalone, no `needs:` -- runs in parallel at the
+  # very start on every trigger): what maven-gpg-plugin does at deploy time, so a
+  # bad/expired key or wrong passphrase is caught in ~20s instead of failing the
+  # publish stage. `environment: maven-central` gives it the SAME secret the publish
+  # jobs use. EXPECTED to go RED where the secret is not delivered (fork PRs, other
+  # contributors' branches): "this ref cannot sign a release", not a regression.
+  # Prints only public key metadata; the security notes are in the action's script.
   # ---------------------------------------------------------------------------
   verify-signing-key:
     name: Verify GPG signing key (no secrets printed)
     runs-on: ubuntu-latest
     environment: maven-central
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: bernardladenthin/actions/common/verify-gpg-key@7646ab0603d75ee130463eceaa8988f7352e2d6a # v1.0.0
         with:
-          persist-credentials: false
-      - name: Import key + run sign/verify self-test (prints only PUBLIC metadata)
-        env:
-          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-        # Shared, byte-identical in all four repos; the security notes are in the script.
-        run: bash .github/verify-signing-key.sh
+          private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
   # ---------------------------------------------------------------------------
-  # GPG signing-key preflight — GRADLE / BouncyCastle path.
-  # Companion to the `verify-signing-key` (gpg) job above: that one mirrors
-  # maven-gpg-plugin (how the Maven artifacts are signed); this one drives
-  # Gradle's `signing` plugin + `useInMemoryPgpKeys` (BouncyCastle) — the path any
-  # Gradle-based publish (e.g. an Android AAR) uses to sign. BouncyCastle is a
-  # STRICTER parser of the armored key than gpg, so it catches key/format problems
-  # gpg tolerates (e.g. the primary-vs-signing-subkey null-PGPPrivateKey issue).
-  # It signs a throwaway project (.github/signing-selftest/) — no repo build is
-  # involved — so this job is IDENTICAL across the sibling repos and validates the
-  # release key via the Gradle path even in repos that do not publish via Gradle
-  # yet ("prepared for Gradle"). Standalone (no `needs:`), parallel at pipeline
-  # start, `environment: maven-central` so it reads the same secret the publish
-  # uses. Red-by-design where the secret is not delivered (see the gpg job's note).
-  #
-  # SECURITY: prints no secret material. Key/passphrase reach Gradle only via env
-  # (read by System.getenv at runtime); `set -x` is never enabled; the passphrase
-  # is `::add-mask::`ed; Gradle runs with `--stacktrace` only. Only the produced
-  # `.asc` (exit code) is asserted. Uses Gradle 9.6.1.
+  # The same key through Gradle's signing plugin + useInMemoryPgpKeys (BouncyCastle),
+  # the path a Gradle publication (an Android AAR) signs with. BouncyCastle parses the
+  # armored key more strictly than gpg, so it catches what the job above tolerates.
+  # It signs the action's own throwaway project, so it is the same in every repository
+  # ("prepared for Gradle"). Red by design where the secret is not delivered.
   # ---------------------------------------------------------------------------
   verify-signing-key-gradle:
     name: Verify GPG signing key — Gradle/BouncyCastle path (no secrets printed)
@@ -147,40 +119,13 @@ jobs:
     environment: maven-central
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with:
-          java-version-file: .java-version
-          distribution: temurin
-      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6
+          persist-credentials: false
+      - uses: bernardladenthin/actions/java/verify-signing-key-gradle@7646ab0603d75ee130463eceaa8988f7352e2d6a # v1.0.0
         with:
-          gradle-version: "9.8.2"
-      - name: Sign a throwaway artifact via useInMemoryPgpKeys (BouncyCastle)
-        shell: bash
-        env:
-          MAVEN_GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-          MAVEN_GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
-        run: |
-          set -euo pipefail   # NOTE: deliberately NO `set -x` — it would echo the passphrase.
-
-          if [ -z "${MAVEN_GPG_PRIVATE_KEY:-}" ]; then
-            echo "::error::MAVEN_GPG_PRIVATE_KEY is empty for this run. The maven-central environment did not deliver the secret to this ref (fork PR / other branch). Nothing to verify."
-            exit 1
-          fi
-          if [ -n "${MAVEN_GPG_PASSPHRASE:-}" ]; then echo "::add-mask::${MAVEN_GPG_PASSPHRASE}"; fi
-
-          PROJ=".github/signing-selftest"
-          echo "== Sign a throwaway artifact through Gradle's useInMemoryPgpKeys (BouncyCastle) =="
-          gradle --no-daemon -p "$PROJ" signMakeArtifact --stacktrace
-
-          ASC="$PROJ/build/signing-selftest.zip.asc"
-          if [ -f "$ASC" ]; then
-            echo "  Detached signature produced: $(wc -c < "$ASC") armored bytes"
-            echo "RESULT: OK — Gradle's useInMemoryPgpKeys accepted the armored key + passphrase and produced a signature."
-          else
-            echo "::error::Gradle signing produced no .asc — useInMemoryPgpKeys could not build a usable signatory from MAVEN_GPG_PRIVATE_KEY / MAVEN_GPG_PASSPHRASE."
-            exit 1
-          fi
+          private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          key-id: ${{ secrets.GPG_KEY_ID }}
 
   code-style:
     name: Code style (spotless) + package graph
@@ -188,20 +133,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with:
-          java-version-file: .java-version
-          distribution: temurin
-      - name: Spotless check (fail fast on format violations)
-        run: mvn -B --no-transfer-progress spotless:check
-      - name: SpotBugs check (fail fast on static-analysis findings)
-        run: mvn -B --no-transfer-progress -DskipTests -Denforcer.skip=true compile spotbugs:check
-      - name: Print internal package dependency graph (jdeps, informational)
-        continue-on-error: true
-        run: |
-          mvn -B --no-transfer-progress -DskipTests -Denforcer.skip=true compile
-          echo "=== internal package dependency graph (jdeps, bytecode) ==="
-          jdeps -verbose:package target/classes | grep 'net\.ladenthin\.' || true
+          persist-credentials: false
+      - uses: bernardladenthin/actions/java/maven-code-style@7646ab0603d75ee130463eceaa8988f7352e2d6a # v1.0.0
+        with:
+          package-pattern: 'net\.ladenthin\.'
 
   build:
     name: Build
@@ -214,6 +150,7 @@ jobs:
           java-version-file: .java-version
           distribution: temurin
           cache: maven
+      - uses: bernardladenthin/actions/common/setup@7646ab0603d75ee130463eceaa8988f7352e2d6a # v1.0.0
       - name: Build
         # -Dmaven.javadoc.skip=true is REQUIRED here and is the ONLY surviving javadoc
         # skip across all four sibling repos (do not remove without the full-build check
@@ -234,14 +171,17 @@ jobs:
         # Central asset (never deployed there). It IS attached to the GitHub Release, but that copy
         # is produced+signed independently by the publish-release / publish-snapshot jobs (their
         # "Build & sign fat jar" step), not taken from this build job's upload-artifact.
+        # The assembly profile runs the license collector of bernardladenthin/actions (ACTIONS_DIR,
+        # exported by the setup step above).
         run: mvn --batch-mode --no-transfer-progress -P assembly -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -DskipTests -Dmaven.javadoc.skip=true package
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with: { name: jars, path: target/*.jar }
       # Echo the crash logs into the job log (workspace/policies/ci-test-diagnostics.md 3.1).
       - name: Print crash logs (on failure)
         if: failure()
-        shell: bash
-        run: bash .github/print-crash-logs.sh .
+        uses: bernardladenthin/actions/java/print-crash-logs@7646ab0603d75ee130463eceaa8988f7352e2d6a # v1.0.0
+        with:
+          modules: .
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
@@ -266,8 +206,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Display CPU Info
-        shell: bash
-        run: bash .github/print-host-info.sh
+        uses: bernardladenthin/actions/common/print-host-info@7646ab0603d75ee130463eceaa8988f7352e2d6a # v1.0.0
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with:
           java-version-file: .java-version
@@ -282,8 +221,9 @@ jobs:
       # Echo the crash logs into the job log (workspace/policies/ci-test-diagnostics.md 3.1).
       - name: Print crash logs (on failure)
         if: failure()
-        shell: bash
-        run: bash .github/print-crash-logs.sh .
+        uses: bernardladenthin/actions/java/print-crash-logs@7646ab0603d75ee130463eceaa8988f7352e2d6a # v1.0.0
+        with:
+          modules: .
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
@@ -330,8 +270,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Display CPU Info
-        shell: bash
-        run: bash .github/print-host-info.sh
+        uses: bernardladenthin/actions/common/print-host-info@7646ab0603d75ee130463eceaa8988f7352e2d6a # v1.0.0
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with:
           java-version-file: .java-version
@@ -395,8 +334,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Display CPU Info
-        shell: bash
-        run: bash .github/print-host-info.sh
+        uses: bernardladenthin/actions/common/print-host-info@7646ab0603d75ee130463eceaa8988f7352e2d6a # v1.0.0
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with:
           java-version-file: .java-version
@@ -447,14 +385,20 @@ jobs:
       # the secp256k1 kernel, fixed in bc9d922) leaves an hs_err_pid log + a surefire
       # dumpstream that are otherwise only inside the uploaded artifact. Echo them into the job log
       # on failure so the native frame is readable directly.
-      - name: Dump native crash logs (on failure)
+      - name: Dump memory and thread state (on failure)
         if: ${{ failure() }}
         shell: bash
         run: |
           echo "===== free -m (post-failure) ====="; free -m || true
           echo "===== thread/process count (post-failure) ====="; ps -eL 2>/dev/null | wc -l || true
-          # hs_err + surefire dumps: the shared step of every other test job.
-          bash .github/print-crash-logs.sh
+      # hs_err + surefire dumps: the shared step of every other test job.
+      - name: Dump native crash logs (on failure)
+        if: ${{ failure() }}
+        uses: bernardladenthin/actions/java/print-crash-logs@7646ab0603d75ee130463eceaa8988f7352e2d6a # v1.0.0
+      - name: Dump OpenCL surefire reports (on failure)
+        if: ${{ failure() }}
+        shell: bash
+        run: |
           shopt -s nullglob
           echo "===== OpenCL surefire reports ====="
           for f in target/surefire-reports/*OpenCL*.txt; do [ -e "$f" ] && { echo "----- $f -----"; cat "$f"; }; done
@@ -481,8 +425,11 @@ jobs:
   # jar — the closest analogue to what jllama's smoke checks — with no network and no GPU. It is
   # deliberately a plain `java -jar`: examples/run_AddressFilesToLMDB.sh passes a long
   # --add-opens/--add-exports list for lmdbjava's internal-JDK reflection, but the import runs
-  # clean without it on JDK 21, and the contract under test is that the published artifact runs
-  # as-is. Keep this job on the OpenCL-free runner: it must not depend on an ICD being installed.
+  # clean without it, and the contract under test is that the published artifact runs as-is. It
+  # runs twice: on the build JDK of .java-version, and on Java 21, the floor the jar is compiled
+  # for (release 21) and the only run of anything on that floor, since every other job builds and
+  # tests on .java-version. Keep this job on the OpenCL-free runner: it must not depend on an ICD
+  # being installed.
   # ---------------------------------------------------------------------------
 
   smoke-fatjar:
@@ -507,11 +454,36 @@ jobs:
       # 65 = Java 21, this project's target -- deliberately NOT the 52 the Java 8 siblings use.
       # That is why the ceiling is an argument: it belongs next to the release it describes.
       - name: Verify Java 21 bytecode (no class newer than major 65)
-        run: .github/verify-bytecode-version.sh --max-major 65 fatjar
+        uses: bernardladenthin/actions/java/verify-bytecode@7646ab0603d75ee130463eceaa8988f7352e2d6a # v1.0.0
+        with:
+          max-major: "65"
+          paths: |
+            fatjar
       - name: Run fat-jar smoke test
+        uses: bernardladenthin/actions/java/smoke-fatjar-cli@7646ab0603d75ee130463eceaa8988f7352e2d6a # v1.0.0
+        with:
+          jar-dir: fatjar
+          jar-glob: 'bitcoinaddressfinder-*-jar-with-dependencies.jar'
+          work-dir: examples
+          marker: 'Main#run end\.'
+          args: config_AddressFilesToLMDB.json
+      - name: Install Java 21, the floor of the published jar
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
+        with:
+          java-version: '21'
+          distribution: temurin
+      - name: Start the Java 21 run from a fresh database, as the first run did
         run: |
-          .github/smoke-fatjar-cli.sh fatjar 'bitcoinaddressfinder-*-jar-with-dependencies.jar' \
-            examples 'Main#run end\.' config_AddressFilesToLMDB.json
+          java -version
+          rm -rf examples/lmdb
+      - name: Run the same fat jar on Java 21
+        uses: bernardladenthin/actions/java/smoke-fatjar-cli@7646ab0603d75ee130463eceaa8988f7352e2d6a # v1.0.0
+        with:
+          jar-dir: fatjar
+          jar-glob: 'bitcoinaddressfinder-*-jar-with-dependencies.jar'
+          work-dir: examples
+          marker: 'Main#run end\.'
+          args: config_AddressFilesToLMDB.json
       - name: Upload smoke logs
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
@@ -527,24 +499,19 @@ jobs:
     needs: [test, test-opencl]
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with:
-          java-version-file: .java-version
-          distribution: temurin
+          persist-credentials: false
       # Prefer coverage from the pocl job: it runs ALL tests including @OpenCLTest
       # (the ubuntu `test` matrix skips those because no ICD is installed there,
       # so its jacoco-report shows 0% for the entire OpenCL pipeline).
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with: { name: jacoco-report-opencl, path: target/site/jacoco/ }
         continue-on-error: true
-      # Submits the dependency graph to GitHub. Informational: it says nothing about whether the
-      # artifacts are correct, but it sits in the `report` job, which the release path needs -- so
-      # without this flag a third-party action having a bad day can block a publish.
-      - uses: advanced-security/maven-dependency-submission-action@a64327a7329c9939cf675e458452febe1894a70c # v6
-        continue-on-error: true
+      # The dependency graph is submitted by dependency-submission.yml (on pushes to main, with the
+      # JDK of .java-version), not here: this job gates the release path and needs no write access.
       - name: Coveralls
         uses: coverallsapp/github-action@8d6379e14d29928660c4ba802d8e85393440b329 # v2
         with:
@@ -567,8 +534,17 @@ jobs:
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       (github.event_name == 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/v'))
     steps:
-      - name: Confirm snapshot ref
-        run: echo "Confirmed on snapshot ref ${{ github.ref }}"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      # Every project version ends in -SNAPSHOT before anything is published to the snapshot channel.
+      # Only then: a push publishes nothing, and main carries the release version for the commit
+      # a release is tagged on.
+      - name: Require a SNAPSHOT version
+        if: inputs.publish_to_central
+        uses: bernardladenthin/actions/java/check-release-ref@7646ab0603d75ee130463eceaa8988f7352e2d6a # v1.0.0
+        with:
+          channel: snapshot
 
   check-tag:
     name: "Check: v* tag"
@@ -576,15 +552,30 @@ jobs:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
-      - name: Confirm tag ref
-        run: echo "Confirmed on tag ${{ github.ref }}"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      # The tag names exactly the project version (v1.2.3 for 1.2.3), which is no SNAPSHOT.
+      - name: Require the release version the tag names
+        uses: bernardladenthin/actions/java/check-release-ref@7646ab0603d75ee130463eceaa8988f7352e2d6a # v1.0.0
+        with:
+          channel: release
 
   publish-snapshot:
-    name: Publish Snapshot to Central
-    needs: [check-snapshot, code-style, smoke-fatjar, shared-files, vmlens]
+    name: Prepare and verify signed snapshot artifacts
+    needs:
+      - check-snapshot
+      - code-style
+      - smoke-fatjar
+      - repository-checks
+      - vmlens
     if: needs.check-snapshot.result == 'success' && inputs.publish_to_central
     runs-on: ubuntu-latest
     environment: maven-central
+    outputs:
+      assets_complete: ${{ steps.finalize.outputs.complete }}
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
@@ -603,207 +594,65 @@ jobs:
           VERSION=$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version | tail -n1)
           echo "Resolved project version: $VERSION"
           case "$VERSION" in
-            *-SNAPSHOT) echo "OK: -SNAPSHOT version, continuing snapshot deploy." ;;
+            *-SNAPSHOT) echo "OK: -SNAPSHOT version, continuing local snapshot staging." ;;
             *) echo "::error::Refusing to publish non-SNAPSHOT version '$VERSION' from the snapshot job. Snapshot publishing requires a -SNAPSHOT version; releases go through the v* tag path."; exit 1 ;;
           esac
-      # Informational only (nothing depends on it): logs the effective POM with the same
-      # profile as the deploy below, so the resolved central-publishing configuration
-      # (waitUntil/waitMaxTime etc.) is visible for debugging.
       - name: Show effective POM (debug)
-        run: mvn --batch-mode --no-transfer-progress -P release help:effective-pom
-      # -Dmaven.repository.credentialScope=id: Maven 3.10 (on the runners since 2026-10) sends a server's
-      # credentials only to its declared origins, and for the id `central` that is repo.maven.apache.org --
-      # an upload to central.sonatype.com then goes out anonymously and fails with HTTP 401.
-      # Restores id-only matching; replace with setup-java's `mvn-server-repository-origins:
-      # central:https://central.sonatype.com` once a release of setup-java ships that input.
-      - name: Deploy snapshot
-        run: mvn --batch-mode --no-transfer-progress -Dmaven.repository.credentialScope=id -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -P release deploy -DskipTests
+        run: mvn --batch-mode --no-transfer-progress -P release -DskipUpload=true help:effective-pom
+      - name: Stage snapshot
+        run: mvn --batch-mode --no-transfer-progress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -P release -DskipUpload=true deploy
+          -DskipTests
         env:
-          MAVEN_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
-          MAVEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-      # Build + GPG-sign the runnable fat jar (bitcoinaddressfinder-<version>-jar-with-dependencies.jar)
-      # as a GitHub-Release asset ONLY — it is deliberately NOT deployed to Maven Central. The Deploy
-      # step above (`-P release deploy`, no `assembly`) already pushed the main/sources/javadoc jars to
-      # Central; this second invocation adds the `assembly` profile and stops at `verify` (never
-      # reaching `deploy`), so the central-publishing plugin's publish goal — bound to the deploy phase —
-      # does nothing here. `verify` runs: package (assembly `single` attaches the fat jar) → verify
-      # (maven-gpg-plugin signs every attached artifact, incl. the fat jar → .jar.asc). It rebuilds and
-      # re-signs the main/sources jars in target/ too (harmless), so the Collect step below now
-      # also finds the fat jar + its .asc. Runs only if the deploy succeeded.
-      #
-      # -Dmaven.javadoc.skip=true is REQUIRED here: this invocation shares target/ with the Deploy
-      # step above with no `mvn clean` between them. That step's own module-info-compile execution
-      # already left target/classes/module-info.class on disk, so THIS invocation's attach-javadocs
-      # would see the module descriptor and flip into JPMS module mode — before this invocation's own
-      # module-info-compile even runs, since attach-javadocs is ordered first (see CLAUDE.md "JPMS
-      # module descriptor" section). The single-invocation "javadoc before module-info-compile"
-      # ordering fix protects against a fresh compile within one invocation; it does nothing against
-      # a *prior* invocation's leftover module-info.class (2026-08-02 incident, run 30768800950:
-      # "error: No source files for package net.ladenthin.bitcoinaddressfinder.io"). Safe to skip:
-      # the Deploy step already built + signed a correct, classpath-mode javadoc jar, and this
-      # invocation never touches or re-signs it — the untouched javadoc.jar + javadoc.jar.asc from
-      # the Deploy step are what the Collect step below picks up.
-      - name: Build & sign fat jar (GitHub asset only — not deployed to Central)
+      # actionlib on PYTHONPATH and ACTIONS_DIR for the steps below: the preservation and the license
+      # collector the assembly profile runs.
+      - uses: bernardladenthin/actions/common/setup@7646ab0603d75ee130463eceaa8988f7352e2d6a # v1.0.0
+      - name: Preserve signed Central outputs before the fat jar rebuild
+        run: python3 -m actionlib.java.releaseassets central-assets --maven-only
+      - name: "Build & sign fat jar (GitHub asset only \u2014 not deployed to Central)"
         run: mvn --batch-mode --no-transfer-progress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -Dmaven.javadoc.skip=true -P release,assembly verify -DskipTests
         env:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-      # Runs even when the deploy step failed: a Central publish-poll timeout reds the
-      # job *after* the bundle was uploaded (and typically published server-side), while
-      # the signed jars and poms + .asc files already exist in target/ (signing happens at
-      # verify). Collecting on failure lets the github-snapshot job still attach them.
-      - name: Collect signed artifacts
-        if: ${{ !cancelled() }}
-        run: |
-          mkdir -p signed-snapshot-assets
-          cp target/*.jar signed-snapshot-assets/ 2>/dev/null || true
-          cp target/*.jar.asc signed-snapshot-assets/ 2>/dev/null || true
-          # maven-gpg writes target/<artifactId>-<version>.pom next to its .pom.asc; Central has both.
-          cp target/*.pom signed-snapshot-assets/ 2>/dev/null || true
-          cp target/*.pom.asc signed-snapshot-assets/ 2>/dev/null || true
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        if: ${{ !cancelled() }}
+      - name: Finalize and secure the signed publication
+        id: finalize
+        uses: bernardladenthin/actions/java/finalize-publication@7646ab0603d75ee130463eceaa8988f7352e2d6a # v1.0.0
         with:
-          name: signed-snapshot-assets
-          path: signed-snapshot-assets/
+          channel: snapshot
+          maven-assets: central-assets
 
   github-snapshot:
     name: Update Snapshot Pre-release on GitHub
-    needs: [publish-snapshot]
-    # Also runs when publish-snapshot FAILED (not when skipped/cancelled): a Central
-    # publish-poll timeout reds that job after the artifacts were already uploaded —
-    # the GitHub pre-release assets must not be lost in that case.
-    if: ${{ !cancelled() && (needs.publish-snapshot.result == 'success' || needs.publish-snapshot.result == 'failure') }}
+    needs:
+      - publish-snapshot
+    if: ${{ !cancelled() && needs.publish-snapshot.outputs.assets_complete == 'true' }}
     runs-on: ubuntu-latest
+    concurrency:
+      group: snapshot-release-${{ github.repository }}
+      cancel-in-progress: false
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+      - uses: bernardladenthin/actions/java/publish-github@7646ab0603d75ee130463eceaa8988f7352e2d6a # v1.0.0
         with:
-          name: signed-snapshot-assets
-          path: snapshot-assets/
-      - name: Report unsigned assets (does not block the upload)
-        # Deliberately NON-blocking, and deliberately BEFORE the upload. Both attach jobs run even
-        # when their publish job failed, because a Central publish-poll timeout must not cost the
-        # GitHub assets: if Central is unreachable these are the ONLY way to get the artifacts at
-        # all. Refusing to attach on a signing failure would defeat exactly that. So annotate here,
-        # upload regardless, and fail the job afterwards. Assets always land; an unsigned release is
-        # still loudly red rather than quietly wrong.
-        # See workspace/policies/fat-jar-release-assets.md, "Attach first, then go red".
-        id: signatures
-        run: |
-          set -uo pipefail
-          dir="snapshot-assets"
-          # Every attachable artifact type, not only jars: with '*.jar' alone the AARs were attached
-          # unsigned for months and nothing counted them, so the job reported success.
-          artifacts=$(find "$dir" -maxdepth 1 \( -name '*.jar' -o -name '*.aar' -o -name '*.pom' \) | sort)
-          if [ -z "$artifacts" ]; then
-            echo "::error::no artifacts in $dir -- the collection step produced nothing"
-            echo "missing=-1" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          missing=0
-          for artifact in $artifacts; do
-            if [ ! -e "$artifact.asc" ]; then
-              echo "::error::unsigned: $(basename "$artifact") has no detached .asc"
-              missing=$((missing + 1))
-            fi
-          done
-          echo "missing=$missing" >> "$GITHUB_OUTPUT"
-          [ "$missing" -eq 0 ] && echo "all $(echo "$artifacts" | wc -l) artifact(s) signed"
-          exit 0
-      - name: Update snapshot pre-release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release view snapshot --repo ${{ github.repository }} 2>/dev/null \
-            || gh release create snapshot \
-                 --repo ${{ github.repository }} \
-                 --prerelease \
-                 --title "Snapshot (latest)" \
-                 --notes "Latest snapshot build from the main branch."
-          gh release upload snapshot snapshot-assets/* \
-            --repo ${{ github.repository }} \
-            --clobber
-      - name: Remove the assets this run did not upload
-        # `snapshot` is a rolling "latest" pre-release, and `gh release upload --clobber` replaces
-        # same-named assets but never removes any other, so every asset of every past version stayed
-        # forever: 208 on java-llama.cpp (109 of them from 5.0.x, 43 in shapes that no longer exist),
-        # and SpotBugs plugin jars an old collect step attached in 2026-05 on three repositories. A
-        # non-current asset on this release is noise by definition. The keep-set is what this run
-        # uploaded -- the files in the asset directory -- never a version pattern, which would have to
-        # be re-taught at every classifier added or dropped (how the stale shapes arose). AFTER the
-        # upload on purpose: a failed upload must not leave the release emptier than it was. And only
-        # here: a versioned v* release is history, github-release never deletes anything. Every
-        # deletion is printed by name, so the job log is the audit trail.
-        #
-        # Asset by asset, never the release. The first form of this job (2026-05-07) deleted the whole
-        # `snapshot` release with its tag and recreated it; on 2026-05-10 the runs of several main
-        # pushes minutes apart deleted it under each other, and every job of each burst but the last
-        # failed in that step with its artifacts present. The job then went with the Central
-        # migration and came back as `view || create` + `upload --clobber` without any cleanup, which
-        # is how the backlog grew (workspace/policies/fat-jar-release-assets.md has the runs). Hence
-        # three guards: an empty upload is refused (every asset would count as stale; the download
-        # and upload steps above fail first, the guard keeps it so), an asset that is already gone
-        # counts as removed (two overlapping dispatches may both pick it), and a failed deletion is
-        # reported and the rest still tried -- the assets of this upload are on the release either
-        # way, so this is "attach first, then red" like the signature check.
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          keep="$(ls -1 snapshot-assets | sort)"
-          if [ -z "$keep" ]; then
-            echo "::error::refusing to prune: this run uploaded nothing, so every asset of the release would count as stale"
-            exit 1
-          fi
-          list_assets() {
-            gh release view snapshot --repo ${{ github.repository }} --json assets --jq '.assets[].name' | sort
-          }
-          current="$(list_assets)"
-          stale="$(comm -13 <(printf '%s\n' "$keep") <(printf '%s\n' "$current"))"
-          if [ -z "$stale" ]; then
-            echo "nothing to remove: the release holds exactly the $(printf '%s\n' "$keep" | wc -l) asset(s) of this upload"
-            exit 0
-          fi
-          echo "removing $(printf '%s\n' "$stale" | wc -l) asset(s) that are not part of this upload:"
-          failed=0
-          while IFS= read -r name; do
-            [ -n "$name" ] || continue
-            echo "  deleting $name"
-            if gh release delete-asset snapshot "$name" --repo ${{ github.repository }} --yes; then
-              continue
-            fi
-            if ! remaining="$(list_assets)"; then
-              echo "::error::could not delete $name, and could not re-read the release to tell whether it is gone"
-              failed=$((failed + 1))
-            elif printf '%s\n' "$remaining" | grep -qxF -- "$name"; then
-              echo "::error::could not delete $name"
-              failed=$((failed + 1))
-            else
-              echo "  $name was already gone"
-            fi
-          done <<< "$stale"
-          if [ "$failed" -ne 0 ]; then
-            echo "::error::$failed asset(s) could not be removed; the $(printf '%s\n' "$keep" | wc -l) asset(s) of this upload are on the release"
-            exit 1
-          fi
-          echo "kept the $(printf '%s\n' "$keep" | wc -l) asset(s) of this upload"
-      - name: Fail if anything was attached unsigned
-        # After the upload on purpose: the assets must exist even when the signature does not.
-        if: ${{ always() && steps.signatures.outputs.missing != '0' }}
-        run: |
-          echo "::error::${{ steps.signatures.outputs.missing }} asset(s) attached without a signature (-1 means none were collected at all)"
-          exit 1
+          channel: snapshot
+          assets-complete: ${{ needs.publish-snapshot.outputs.assets_complete }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
   publish-release:
-    name: Publish Release to Central
-    needs: [check-tag, code-style, smoke-fatjar, shared-files, vmlens]
+    name: Prepare and verify signed release artifacts
+    needs:
+      - check-tag
+      - code-style
+      - smoke-fatjar
+      - repository-checks
+      - vmlens
     if: needs.check-tag.result == 'success' && inputs.publish_to_central
     runs-on: ubuntu-latest
     environment: maven-central
+    outputs:
+      assets_complete: ${{ steps.finalize.outputs.complete }}
     permissions:
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
@@ -816,115 +665,119 @@ jobs:
           server-password: MAVEN_PASSWORD
           gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
           gpg-passphrase: MAVEN_GPG_PASSPHRASE
-      # Informational only (nothing depends on it): logs the effective POM with the same
-      # profile as the deploy below, so the resolved central-publishing configuration
-      # (waitUntil/waitMaxTime etc.) is visible for debugging.
       - name: Show effective POM (debug)
-        run: mvn --batch-mode --no-transfer-progress -P release help:effective-pom
-      # -Dmaven.repository.credentialScope=id: see the first deploy step of this file (Maven 3.10).
-      - name: Deploy release
-        run: mvn --batch-mode --no-transfer-progress -Dmaven.repository.credentialScope=id -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -P release deploy -DskipTests
+        run: mvn --batch-mode --no-transfer-progress -P release -DskipUpload=true help:effective-pom
+      - name: Stage release
+        run: mvn --batch-mode --no-transfer-progress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -P release -DskipUpload=true deploy
+          -DskipTests
         env:
-          MAVEN_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
-          MAVEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-      # Build + GPG-sign the runnable fat jar (bitcoinaddressfinder-<version>-jar-with-dependencies.jar)
-      # as a GitHub-Release asset ONLY — it is deliberately NOT deployed to Maven Central. The Deploy
-      # step above (`-P release deploy`, no `assembly`) already pushed the main/sources/javadoc jars to
-      # Central; this second invocation adds the `assembly` profile and stops at `verify` (never
-      # reaching `deploy`), so the central-publishing plugin's publish goal — bound to the deploy phase —
-      # does nothing here. `verify` runs: package (assembly `single` attaches the fat jar) → verify
-      # (maven-gpg-plugin signs every attached artifact, incl. the fat jar → .jar.asc). It rebuilds and
-      # re-signs the main/sources jars in target/ too (harmless), so the Collect step below now
-      # also finds the fat jar + its .asc. Runs only if the deploy succeeded.
-      #
-      # -Dmaven.javadoc.skip=true is REQUIRED here: this invocation shares target/ with the Deploy
-      # step above with no `mvn clean` between them. That step's own module-info-compile execution
-      # already left target/classes/module-info.class on disk, so THIS invocation's attach-javadocs
-      # would see the module descriptor and flip into JPMS module mode — before this invocation's own
-      # module-info-compile even runs, since attach-javadocs is ordered first (see CLAUDE.md "JPMS
-      # module descriptor" section). The single-invocation "javadoc before module-info-compile"
-      # ordering fix protects against a fresh compile within one invocation; it does nothing against
-      # a *prior* invocation's leftover module-info.class (2026-08-02 incident, run 30768800950:
-      # "error: No source files for package net.ladenthin.bitcoinaddressfinder.io"). Safe to skip:
-      # the Deploy step already built + signed a correct, classpath-mode javadoc jar, and this
-      # invocation never touches or re-signs it — the untouched javadoc.jar + javadoc.jar.asc from
-      # the Deploy step are what the Collect step below picks up.
-      - name: Build & sign fat jar (GitHub asset only — not deployed to Central)
+      # actionlib on PYTHONPATH and ACTIONS_DIR for the steps below: the preservation and the license
+      # collector the assembly profile runs.
+      - uses: bernardladenthin/actions/common/setup@7646ab0603d75ee130463eceaa8988f7352e2d6a # v1.0.0
+      - name: Preserve signed Central outputs before the fat jar rebuild
+        run: python3 -m actionlib.java.releaseassets central-assets --maven-only
+      - name: "Build & sign fat jar (GitHub asset only \u2014 not deployed to Central)"
         run: mvn --batch-mode --no-transfer-progress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -Dmaven.javadoc.skip=true -P release,assembly verify -DskipTests
         env:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-      # Runs even when the deploy step failed: a Central publish-poll timeout reds the
-      # job *after* the bundle was uploaded (and typically published server-side), while
-      # the signed jars and poms + .asc files already exist in target/ (signing happens at
-      # verify). Collecting on failure lets the github-release job still attach them.
-      - name: Collect signed artifacts
-        if: ${{ !cancelled() }}
-        run: |
-          mkdir -p signed-release-assets
-          cp target/*.jar signed-release-assets/ 2>/dev/null || true
-          cp target/*.jar.asc signed-release-assets/ 2>/dev/null || true
-          # maven-gpg writes target/<artifactId>-<version>.pom next to its .pom.asc; Central has both.
-          cp target/*.pom signed-release-assets/ 2>/dev/null || true
-          cp target/*.pom.asc signed-release-assets/ 2>/dev/null || true
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        if: ${{ !cancelled() }}
+      - name: Finalize and secure the signed publication
+        id: finalize
+        uses: bernardladenthin/actions/java/finalize-publication@7646ab0603d75ee130463eceaa8988f7352e2d6a # v1.0.0
         with:
-          name: signed-release-assets
-          path: signed-release-assets/
+          channel: release
+          maven-assets: central-assets
 
   github-release:
     name: Attach Binaries to GitHub Release
-    needs: [publish-release]
-    # Also runs when publish-release FAILED (not when skipped/cancelled): a Central
-    # publish-poll timeout reds that job after the artifacts were already uploaded —
-    # the GitHub release assets must not be lost in that case.
-    if: ${{ !cancelled() && (needs.publish-release.result == 'success' || needs.publish-release.result == 'failure') }}
+    needs:
+      - publish-release
+    if: ${{ !cancelled() && needs.publish-release.outputs.assets_complete == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+      - uses: bernardladenthin/actions/java/publish-github@7646ab0603d75ee130463eceaa8988f7352e2d6a # v1.0.0
         with:
-          name: signed-release-assets
-          path: release-assets/
-      - name: Report unsigned assets (does not block the upload)
-        # Deliberately NON-blocking, and deliberately BEFORE the upload. Both attach jobs run even
-        # when their publish job failed, because a Central publish-poll timeout must not cost the
-        # GitHub assets: if Central is unreachable these are the ONLY way to get the artifacts at
-        # all. Refusing to attach on a signing failure would defeat exactly that. So annotate here,
-        # upload regardless, and fail the job afterwards. Assets always land; an unsigned release is
-        # still loudly red rather than quietly wrong.
-        # See workspace/policies/fat-jar-release-assets.md, "Attach first, then go red".
-        id: signatures
-        run: |
-          set -uo pipefail
-          dir="release-assets"
-          # Every attachable artifact type, not only jars: with '*.jar' alone the AARs were attached
-          # unsigned for months and nothing counted them, so the job reported success.
-          artifacts=$(find "$dir" -maxdepth 1 \( -name '*.jar' -o -name '*.aar' -o -name '*.pom' \) | sort)
-          if [ -z "$artifacts" ]; then
-            echo "::error::no artifacts in $dir -- the collection step produced nothing"
-            echo "missing=-1" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          missing=0
-          for artifact in $artifacts; do
-            if [ ! -e "$artifact.asc" ]; then
-              echo "::error::unsigned: $(basename "$artifact") has no detached .asc"
-              missing=$((missing + 1))
-            fi
-          done
-          echo "missing=$missing" >> "$GITHUB_OUTPUT"
-          [ "$missing" -eq 0 ] && echo "all $(echo "$artifacts" | wc -l) artifact(s) signed"
-          exit 0
-      - name: Upload release assets
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
+          channel: release
+          assets-complete: ${{ needs.publish-release.outputs.assets_complete }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+  central-snapshot:
+    name: Upload checked snapshot artifacts to Maven Central
+    needs:
+      - publish-snapshot
+    if: ${{ !cancelled() && needs.publish-snapshot.outputs.assets_complete == 'true' }}
+    runs-on: ubuntu-latest
+    environment: maven-central
+    # One transfer at a time; an older commit finishing late is skipped (the superseded check).
+    concurrency:
+      group: central-snapshot-${{ github.repository }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          files: release-assets/*
-      - name: Fail if anything was attached unsigned
-        # After the upload on purpose: the assets must exist even when the signature does not.
-        if: ${{ always() && steps.signatures.outputs.missing != '0' }}
-        run: |
-          echo "::error::${{ steps.signatures.outputs.missing }} asset(s) attached without a signature (-1 means none were collected at all)"
-          exit 1
+          persist-credentials: false
+      - name: Transfer frozen artifacts (no rebuild, signing or validation polling)
+        uses: bernardladenthin/actions/java/publish-central@7646ab0603d75ee130463eceaa8988f7352e2d6a # v1.0.0
+        with:
+          channel: snapshot
+          assets-complete: ${{ needs.publish-snapshot.outputs.assets_complete }}
+          username: ${{ secrets.CENTRAL_USERNAME }}
+          password: ${{ secrets.CENTRAL_TOKEN }}
+
+  central-release:
+    name: Upload checked release artifacts to Maven Central
+    needs:
+      - publish-release
+    if: ${{ !cancelled() && needs.publish-release.outputs.assets_complete == 'true' }}
+    runs-on: ubuntu-latest
+    environment: maven-central
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Transfer frozen artifacts (no rebuild, signing or validation polling)
+        uses: bernardladenthin/actions/java/publish-central@7646ab0603d75ee130463eceaa8988f7352e2d6a # v1.0.0
+        with:
+          channel: release
+          assets-complete: ${{ needs.publish-release.outputs.assets_complete }}
+          username: ${{ secrets.CENTRAL_USERNAME }}
+          password: ${{ secrets.CENTRAL_TOKEN }}
+
+  attest-snapshot:
+    name: Attest the checked snapshot publication
+    needs:
+      - publish-snapshot
+    if: ${{ !cancelled() && needs.publish-snapshot.outputs.assets_complete == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: bernardladenthin/actions/java/attest-publication@7646ab0603d75ee130463eceaa8988f7352e2d6a # v1.0.0
+        with:
+          channel: snapshot
+          assets-complete: ${{ needs.publish-snapshot.outputs.assets_complete }}
+
+  attest-release:
+    name: Attest the checked release publication
+    needs:
+      - publish-release
+    if: ${{ !cancelled() && needs.publish-release.outputs.assets_complete == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: bernardladenthin/actions/java/attest-publication@7646ab0603d75ee130463eceaa8988f7352e2d6a # v1.0.0
+        with:
+          channel: release
+          assets-complete: ${{ needs.publish-release.outputs.assets_complete }}

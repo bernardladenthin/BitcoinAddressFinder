@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+
+SPDX-License-Identifier: Apache-2.0
+-->
+<assembly xmlns="http://maven.apache.org/ASSEMBLY/2.2.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/2.2.0 http://maven.apache.org/xsd/assembly-2.2.0.xsd">
+    <!--
+      Same output as the predefined jar-with-dependencies descriptor, plus one fileSet.
+
+      The dependencySet below is a verbatim copy of the predefined descriptor shipped inside
+      maven-assembly-plugin: outputDirectory /, useProjectArtifact true, unpack true, scope
+      runtime. Keep it that way; the only reason this file exists is the fileSet underneath it,
+      which adds the dependencies' legal files to the fat jar alone. Kept in the same shape as
+      srcmorph's srcmorph-cli/src/assembly/fat-jar.xml.
+    -->
+    <id>jar-with-dependencies</id>
+    <formats>
+        <format>jar</format>
+    </formats>
+    <includeBaseDirectory>false</includeBaseDirectory>
+    <dependencySets>
+        <dependencySet>
+            <outputDirectory>/</outputDirectory>
+            <useProjectArtifact>true</useProjectArtifact>
+            <unpack>true</unpack>
+            <scope>runtime</scope>
+        </dependencySet>
+    </dependencySets>
+    <fileSets>
+        <!-- The legal files of every runtime dependency, collected by the collect-runtime-licenses
+             execution into target/third-party-dependencies (not into target/classes, so the
+             library jar never carries them). They describe the dependencies this jar bundles. -->
+        <fileSet>
+            <directory>${project.build.directory}/third-party-dependencies</directory>
+            <outputDirectory>META-INF/third-party/dependencies</outputDirectory>
+        </fileSet>
+    </fileSets>
+</assembly>

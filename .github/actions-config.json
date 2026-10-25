@@ -1,0 +1,23 @@
+{
+  "$comment": "Configuration of the shared checks of bernardladenthin/actions (see its README).",
+  "templates": {
+    "sets": [
+      "common",
+      "java"
+    ],
+    "exclude": [
+      ".github/workflows/sonarqube.yml",
+      ".mvn/jvm.config",
+      ".mvn/jvm.config.license"
+    ]
+  },
+  "maven-versions": {
+    "poms": [
+      "pom.xml"
+    ],
+    "family": "java-maven",
+    "ignore-groups": [
+      "net.ladenthin"
+    ]
+  }
+}

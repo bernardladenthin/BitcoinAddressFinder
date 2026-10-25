@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+version: 3
+project:
+  locator: git+github.com/bernardladenthin/BitcoinAddressFinder
+
+# No fixed revision.branch: preserve the actual PR/main branch and commit.
+# No license overrides or scope exclusions: test and runtime findings stay visible.
+maven:
+  scope-exclude: []

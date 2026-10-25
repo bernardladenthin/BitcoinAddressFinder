@@ -10,7 +10,8 @@ chaining“.
 - **Nur messen und berichten.** Keine Produktionsänderung, keine Fixes. Die Proben unten liegen außerhalb
   des Repositorys (z. B. `/tmp/sigprobe/`); committet wird nur diese Datei mit den Ergebnissen.
 - Arbeitsstand: Branch `ccr-90fc5f6a-vs4s0f`.
-- Dateien aus `.github/shared-files.sha256` nicht verändern.
+- Dateien, die Vorlagen von bernardladenthin/actions sind (`.github/actions-config.json`, Abschnitt
+  `templates`), nicht verändern.
 - Jeder Teil wird beantwortet, auch wenn er nicht ausführbar war: dann mit Grund. Zu jedem Ergebnis die
   Umgebung (Rechner, CPU/GPU, Treiber, OS, JDK) und die wörtlichen Ausgaben (die Zeilen des Skripts,
   `-Xcheck:jni`-Ausschnitt, Exit-Codes).

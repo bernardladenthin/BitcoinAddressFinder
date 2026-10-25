@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+# Template of bernardladenthin/actions (templates/java); the job is its reusable workflow.
+name: Maven Dependency Submission
+
+on:
+  # The graph GitHub shows is the default branch's. Other branches (Dependabot's among them, whose
+  # pushes get a read-only token) would only fail or add snapshots nobody reads.
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  submit:
+    uses: bernardladenthin/actions/.github/workflows/java-maven-dependency-submission.yml@7646ab0603d75ee130463eceaa8988f7352e2d6a # v1.0.0
+    permissions:
+      contents: write

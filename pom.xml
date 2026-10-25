@@ -40,7 +40,16 @@ SPDX-License-Identifier: Apache-2.0
     </scm>
 
     <properties>
+        <license.python>python3</license.python>
+        <!-- bernardladenthin/actions, whose license collector (actionlib.java.thirdpartylicenses) the
+             fat jar build runs: ACTIONS_DIR in CI (common/setup), else a checkout next to this
+             repository. -->
+        <ci.actions.dir>${maven.multiModuleProjectDirectory}/../actions</ci.actions.dir>
         <sonar.organization>bernardladenthin</sonar.organization>
+        <!-- No Python or other code under .github is covered by a report that reaches Sonar (the
+             shared checks run from bernardladenthin/actions), so counting it would only ever show
+             0 %. Its issues are still analysed. -->
+        <sonar.coverage.exclusions>.github/**</sonar.coverage.exclusions>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <slf4j.version>2.0.20</slf4j.version>
         <logback.version>1.6.5</logback.version>
@@ -69,7 +78,7 @@ SPDX-License-Identifier: Apache-2.0
         <spotbugs.version>4.10.5.0</spotbugs.version>
         <fb-contrib.version>7.7.4</fb-contrib.version>
         <findsecbugs.version>1.14.0</findsecbugs.version>
-        <errorprone.version>2.50.0</errorprone.version>
+        <errorprone.version>2.51.0</errorprone.version>
         <nullaway.version>0.14.2</nullaway.version>
         <checker.version>4.3.1</checker.version>
         <java-websocket.version>1.6.0</java-websocket.version>
@@ -184,6 +193,33 @@ SPDX-License-Identifier: Apache-2.0
 
     <build>
         <resources>
+            <resource>
+                <directory>${project.basedir}/LICENSES</directory>
+                <targetPath>META-INF/third-party/licenses</targetPath>
+                <includes>
+                    <include>CC-BY-2.5.txt</include>
+                    <include>EPL-2.0.txt</include>
+                    <include>MPL-2.0.txt</include>
+                </includes>
+            </resource>
+            <!-- The OpenCL kernels in this jar come from hashcat and port libsecp256k1 code (MIT,
+                 see REUSE.toml); their license texts and the credits file the kernel headers name. -->
+            <resource>
+                <directory>${project.basedir}/third-party-notices</directory>
+                <targetPath>META-INF/third-party/net.ladenthin/${project.artifactId}/embedded</targetPath>
+                <includes>
+                    <include>hashcat-2d71af37/**</include>
+                    <include>secp256k1-v0.8.0/**</include>
+                </includes>
+            </resource>
+            <resource>
+                <directory>${project.basedir}</directory>
+                <targetPath>META-INF/third-party/net.ladenthin/${project.artifactId}</targetPath>
+                <includes>
+                    <include>LICENSE</include>
+                    <include>THIRD_PARTY.md</include>
+                </includes>
+            </resource>
             <resource>
                 <directory>${basedir}/src/main/resources</directory>
             </resource>
@@ -778,9 +814,9 @@ SPDX-License-Identifier: Apache-2.0
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-assembly-plugin</artifactId>
                 <configuration>
-                    <descriptorRefs>
-                        <descriptorRef>jar-with-dependencies</descriptorRef>
-                    </descriptorRefs>
+                    <descriptors>
+                        <descriptor>src/assembly/fat-jar.xml</descriptor>
+                    </descriptors>
                     <archive>
                         <manifest>
                             <mainClass>net.ladenthin.bitcoinaddressfinder.cli.Main</mainClass>
@@ -1213,6 +1249,19 @@ SPDX-License-Identifier: Apache-2.0
 
     <profiles>
         <profile>
+            <!-- ACTIONS_DIR (exported by bernardladenthin/actions' common/setup) wins over the
+                 sibling checkout ci.actions.dir defaults to. -->
+            <id>actions-dir-from-environment</id>
+            <activation>
+                <property>
+                    <name>env.ACTIONS_DIR</name>
+                </property>
+            </activation>
+            <properties>
+                <ci.actions.dir>${env.ACTIONS_DIR}</ci.actions.dir>
+            </properties>
+        </profile>
+        <profile>
             <id>release</id>
             <build>
                 <plugins>
@@ -1242,10 +1291,8 @@ SPDX-License-Identifier: Apache-2.0
                         <configuration>
                             <publishingServerId>central</publishingServerId>
                             <autoPublish>true</autoPublish>
-                            <!-- validated: wait only for portal validation (where real errors surface), not the slow server-side publish; autoPublish completes it -->
-                            <waitUntil>validated</waitUntil>
-                            <!-- seconds; generous headroom for the validation poll (default 1800) -->
-                            <waitMaxTime>21600</waitMaxTime>
+                            <!-- uploaded: acknowledge transfer only; Central validates and publishes asynchronously -->
+                            <waitUntil>uploaded</waitUntil>
                         </configuration>
                     </plugin>
                 </plugins>
@@ -1325,6 +1372,57 @@ SPDX-License-Identifier: Apache-2.0
             <id>assembly</id>
             <build>
                 <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-dependency-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>runtime-license-classpath</id>
+                                <phase>process-classes</phase>
+                                <goals><goal>build-classpath</goal></goals>
+                                <configuration>
+                                    <includeScope>runtime</includeScope>
+                                    <includeTypes>jar</includeTypes>
+                                    <regenerateFile>true</regenerateFile>
+                                    <outputFile>${project.build.directory}/runtime-license-classpath.txt</outputFile>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>3.6.4</version>
+                        <executions>
+                            <execution>
+                                <id>collect-runtime-licenses</id>
+                                <phase>prepare-package</phase>
+                                <goals><goal>exec</goal></goals>
+                                <configuration combine.self="override">
+                                    <executable>${license.python}</executable>
+                                    <environmentVariables>
+                                        <PYTHONPATH>${ci.actions.dir}/lib</PYTHONPATH>
+                                    </environmentVariables>
+                                    <arguments>
+                                        <!-- python3 -m actionlib.java.thirdpartylicenses, but saying where actionlib was looked for
+                                             when it is missing instead of a ModuleNotFoundError. -->
+                                        <argument>-c</argument>
+                                        <argument>import importlib.util, sys; importlib.util.find_spec("actionlib") or sys.exit("The license collector comes from bernardladenthin/actions: set ACTIONS_DIR to a checkout of it, or check it out next to this repository (../actions). Looked in ${ci.actions.dir}/lib"); from actionlib.java.thirdpartylicenses import main; sys.exit(main(sys.argv[1:]))</argument>
+                                        <argument>--classpath</argument>
+                                        <argument>${project.build.directory}/runtime-license-classpath.txt</argument>
+                                        <argument>--output</argument>
+                                        <argument>${project.build.directory}/third-party-dependencies</argument>
+                                        <!-- License texts for runtime JARs that carry none
+                                             (third-party-notices/notices.json); a JAR with neither
+                                             fails the build. -->
+                                        <argument>--supplemental</argument>
+                                        <argument>${project.basedir}/third-party-notices</argument>
+                                        <argument>--require-complete</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-assembly-plugin</artifactId>

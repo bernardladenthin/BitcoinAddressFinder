@@ -13,11 +13,9 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.google.common.io.Resources;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
-import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
@@ -55,7 +53,6 @@ import org.apache.commons.io.FileUtils;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.crypto.ECKey;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -185,91 +182,6 @@ public class ProbeAddressesOpenCLTest {
         }
 
         assertThat(passed, is(equalTo(Boolean.TRUE)));
-    }
-
-    public static int BN_NBITS = 256;
-    public static int BN_WSHIFT = 5;
-    public static int BN_WBITS = (1 << BN_WSHIFT);
-    public static int BN_NWORDS = ((BN_NBITS / 8) / 4); // 4 == sizeof(bn_word)
-
-    public static int ACCESS_BUNDLE = 1024;
-    public static int ACCESS_STRIDE = (ACCESS_BUNDLE / BN_NWORDS);
-
-    @Test
-    @Disabled
-    public void reverseEngineering_startPoints() {
-        int GLOBAL_SIZE = 1024;
-        for (int j = 0; j < 1024; j++) {
-            for (int k = 0; k < 64; k++) {
-                int i, cell, start;
-                System.out.println("========================================");
-                /* Load the row increment point */
-                i = 2 * j;
-                System.out.println("i: " + i);
-
-                cell = i;
-                System.out.println("cell: " + cell);
-                start = ((((2 * cell) / ACCESS_STRIDE) * ACCESS_BUNDLE) + (cell % (ACCESS_STRIDE / 2)));
-                System.out.println("start: " + start);
-
-                int row_in_access_1 = start + (i * ACCESS_STRIDE);
-                System.out.println("row_in_access_1: " + row_in_access_1);
-
-                start += (ACCESS_STRIDE / 2);
-                System.out.println("start: " + start);
-
-                int row_in_access_2 = start + (i * ACCESS_STRIDE);
-                System.out.println("row_in_access_2: " + row_in_access_2);
-
-                cell += (k * GLOBAL_SIZE);
-                System.out.println("cell: " + cell);
-                start = (((cell / ACCESS_STRIDE) * ACCESS_BUNDLE) + (cell % ACCESS_STRIDE));
-                System.out.println("start: " + start);
-                System.out.println("========================================");
-            }
-        }
-    }
-
-    @Test
-    @Disabled
-    public void calcAddrsFixZeroCl_loadWithoutErrors() throws IOException {
-        // ATTENTION: BLDEBUG
-
-        int ROW_SIZE = 2; // x1, y1
-        int COL_SIZE = 2; // rx, ry
-
-        String calcAddrsFixZeroClFileName = "calc_addrs.cl";
-        URL url = Resources.getResource(calcAddrsFixZeroClFileName);
-        String calcAddrsFixZeroCl = Resources.toString(url, StandardCharsets.UTF_8);
-
-        final int pointsOutInts = ACCESS_BUNDLE;
-        final int zHeapInts = ACCESS_BUNDLE;
-        final int rowInInts = ACCESS_BUNDLE * ACCESS_STRIDE * ROW_SIZE;
-        final int colInInts = ACCESS_BUNDLE * COL_SIZE;
-
-        final ClApi clApi = OpenClBinding.defaultClApi();
-        final ClPlatformId platform = clApi.getPlatformIds().get(0);
-        final ClDeviceId device =
-                clApi.getDeviceIds(platform, CL10.CL_DEVICE_TYPE_ALL).get(0);
-        final ClContext context = clApi.createContext(platform, device);
-        final ClCommandQueue commandQueue = clApi.createCommandQueue(context, device, false);
-
-        final ClMem pointsOutMem =
-                clApi.createBuffer(context, ClBufferFlags.READ_WRITE, (long) Integer.BYTES * pointsOutInts);
-        final ClMem zHeapMem = clApi.createBuffer(context, ClBufferFlags.READ_WRITE, (long) Integer.BYTES * zHeapInts);
-        final ClMem rowInMem = clApi.createBuffer(context, ClBufferFlags.READ_ONLY, (long) Integer.BYTES * rowInInts);
-        final ClMem colInMem = clApi.createBuffer(context, ClBufferFlags.READ_ONLY, (long) Integer.BYTES * colInInts);
-
-        final ClProgram program = clApi.createProgramWithSource(context, new String[] {calcAddrsFixZeroCl});
-        clApi.buildProgram(program, device, "");
-
-        final ClKernel kernelEcAddGrid = clApi.createKernel(program, "ec_add_grid");
-        clApi.setKernelArg(kernelEcAddGrid, 0, pointsOutMem);
-        clApi.setKernelArg(kernelEcAddGrid, 1, zHeapMem);
-        clApi.setKernelArg(kernelEcAddGrid, 2, rowInMem);
-        clApi.setKernelArg(kernelEcAddGrid, 3, colInMem);
-
-        clApi.enqueueNDRangeKernel(commandQueue, kernelEcAddGrid, new long[] {ACCESS_BUNDLE}, false);
     }
 
     @ParameterizedTest

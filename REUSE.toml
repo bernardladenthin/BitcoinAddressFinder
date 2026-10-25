@@ -80,10 +80,12 @@ SPDX-License-Identifier = "Apache-2.0"
 
 # ---------------------------------------------------------------------------
 # Third-party: hashcat project files (MIT)
-# Copied verbatim (byte-exact) from hashcat commit
-# 6716447dfce969ddde42a9abe0681500bee0df48 (Apr 20, 2024).
+# Ten of the twelve files are byte-identical to hashcat commit
+# 2d71af3718ef76f69c675e933cb4900c40788c58; inc_ecc_secp256k1.cl and inc_vendor.h are modified here
+# (inc_ecc_secp256k1.cl also carries ports of libsecp256k1, MIT, and a micro-ecc notice, BSD-2-Clause).
 # Source: https://github.com/hashcat/hashcat
-# Files carry "License.....: MIT" in their own header comments.
+# Files carry "License.....: MIT" in their own header comments; the hashcat license text and
+# docs/credits.txt they point to are in third-party-notices/hashcat-2d71af37/.
 # ---------------------------------------------------------------------------
 
 [[annotations]]
@@ -101,8 +103,15 @@ path = [
     "src/main/resources/copyfromhashcat/inc_types.h",
     "src/main/resources/copyfromhashcat/inc_vendor.h",
 ]
-SPDX-FileCopyrightText = "hashcat contributors"
+SPDX-FileCopyrightText = "2015-2025 Jens Steube"
 SPDX-License-Identifier = "MIT"
+
+# The modified secp256k1 kernel also carries big-number code in the manner of micro-ecc (2-Clause
+# BSD, its terms quoted in the file) and the safegcd inverse ported from libsecp256k1 (MIT).
+[[annotations]]
+path = "src/main/resources/copyfromhashcat/inc_ecc_secp256k1.cl"
+SPDX-FileCopyrightText = ["2015-2025 Jens Steube", "2014 Ken MacKay", "2020 Peter Dettman", "2017-2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>"]
+SPDX-License-Identifier = "MIT AND BSD-2-Clause"
 
 # ---------------------------------------------------------------------------
 # Third-party: Bernard Ladenthin custom OpenCL kernel (MIT)
@@ -116,28 +125,8 @@ path = [
 SPDX-FileCopyrightText = "2020 Bernard Ladenthin <bernard.ladenthin@gmail.com>"
 SPDX-License-Identifier = "MIT"
 
-# ---------------------------------------------------------------------------
-# Third-party: vanitygen / OCLExplorer unused OpenCL kernels (AGPL-3.0-or-later)
-# ---------------------------------------------------------------------------
-
-[[annotations]]
-path = [
-    "src/main/resources/unused/calc_addrs.cl",
-    "src/main/resources/unused/calc_addrs_fix_zero.cl",
-]
-SPDX-FileCopyrightText = "2011 <samr7@cs.washington.edu>"
-SPDX-License-Identifier = "AGPL-3.0-or-later"
-
-[[annotations]]
-path = "src/main/resources/unused/gpu.cl"
-SPDX-FileCopyrightText = [
-    "2011 <samr7@cs.washington.edu>",
-    "2017 Stanislav V. Tretyakov <svtrostov@yandex.ru>",
-]
-SPDX-License-Identifier = "AGPL-3.0-or-later"
-
-# The issue/PR templates are kept byte-identical in java-llama.cpp, BitcoinAddressFinder, srcmorph
-# and streambuffer (.github/shared-files.sha256) and carry the license of the other shared files.
+# The issue/PR templates are templates of bernardladenthin/actions (templates/common), checked by
+# its check-templates action, and carry the license of the other template files.
 # Last in this file on purpose: of several matching annotations the last one applies.
 [[annotations]]
 path = [
@@ -147,3 +136,202 @@ path = [
 ]
 SPDX-FileCopyrightText = "2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>"
 SPDX-License-Identifier = "MIT OR Apache-2.0"
+
+# ---------------------------------------------------------------------------
+# Third-party: upstream license texts in third-party-notices/ (see its SOURCES.tsv: source URL
+# and SHA-256 per file). The runtime ones go into the fat jar through
+# the license collector of bernardladenthin/actions (--supplemental); hashcat and secp256k1 cover kernels
+# in this project's own jar.
+# ---------------------------------------------------------------------------
+
+[[annotations]]
+path = ["third-party-notices/notices.json", "third-party-notices/SOURCES.tsv"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>"
+SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+path = "third-party-notices/Java-WebSocket-1.6.0/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2010-2020 Nathan Rajlich"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = "third-party-notices/asm-9.7.1/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2000-2011 INRIA, France Telecom"
+SPDX-License-Identifier = "BSD-3-Clause"
+
+[[annotations]]
+path = "third-party-notices/asm-analysis-9.7.1/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2000-2011 INRIA, France Telecom"
+SPDX-License-Identifier = "BSD-3-Clause"
+
+[[annotations]]
+path = "third-party-notices/asm-commons-9.9.1/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2000-2011 INRIA, France Telecom"
+SPDX-License-Identifier = "BSD-3-Clause"
+
+[[annotations]]
+path = "third-party-notices/asm-tree-9.7.1/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2000-2011 INRIA, France Telecom"
+SPDX-License-Identifier = "BSD-3-Clause"
+
+[[annotations]]
+path = "third-party-notices/asm-util-9.9.1/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2000-2011 INRIA, France Telecom"
+SPDX-License-Identifier = "BSD-3-Clause"
+
+[[annotations]]
+path = "third-party-notices/bcprov-jdk15to18-1.86/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2000-2026 The Legion of the Bouncy Castle Inc."
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = "third-party-notices/bitcoinj-core-0.17.1/**"
+precedence = "override"
+SPDX-FileCopyrightText = "bitcoinj developers (see AUTHORS)"
+SPDX-License-Identifier = "Apache-2.0 AND MIT"
+
+[[annotations]]
+path = "third-party-notices/error_prone_annotations-2.50.0/**"
+precedence = "override"
+SPDX-FileCopyrightText = "The Error Prone Authors"
+SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+path = "third-party-notices/j2objc-annotations-3.1/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2012 Google Inc."
+SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+path = "third-party-notices/jcip-annotations-1.0/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2005 Brian Goetz and Tim Peierls"
+SPDX-License-Identifier = "CC-BY-2.5"
+
+[[annotations]]
+path = "third-party-notices/jeromq-0.6.0/**"
+precedence = "override"
+SPDX-FileCopyrightText = "JeroMQ contributors (see AUTHORS)"
+SPDX-License-Identifier = "MPL-2.0"
+
+[[annotations]]
+path = "third-party-notices/jffi-1.3.14/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2008, 2009 Wayne Meissner; 1996-2022 Anthony Green, Red Hat, Inc and others"
+SPDX-License-Identifier = "(Apache-2.0 OR LGPL-3.0-or-later) AND MIT"
+
+[[annotations]]
+path = "third-party-notices/jnacl-1.0.0/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2011 Neil Alexander T."
+SPDX-License-Identifier = "BSD-2-Clause"
+
+[[annotations]]
+path = "third-party-notices/jnr-a64asm-1.0.0/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2018 Ossdev07"
+SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+path = "third-party-notices/jnr-constants-0.10.4/**"
+precedence = "override"
+SPDX-FileCopyrightText = "jnr-constants contributors"
+SPDX-License-Identifier = "Apache-2.0 OR LGPL-3.0-or-later"
+
+[[annotations]]
+path = "third-party-notices/jnr-ffi-2.2.18/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2008-2010 Wayne Meissner and others"
+SPDX-License-Identifier = "Apache-2.0 OR LGPL-3.0-or-later"
+
+[[annotations]]
+path = "third-party-notices/jnr-x86asm-1.0.2/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2010 Wayne Meissner; 2008-2009 Petr Kobalicek"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = "third-party-notices/jspecify-1.0.1/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2018-2020 The JSpecify Authors"
+SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+path = "third-party-notices/jsr305-3.0.2/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2005 Brian Goetz; JSR-305 expert group"
+SPDX-License-Identifier = "Apache-2.0 AND CC-BY-2.5"
+
+[[annotations]]
+path = "third-party-notices/listenablefuture-9999.0-empty-to-avoid-conflict-with-guava/**"
+precedence = "override"
+SPDX-FileCopyrightText = "The Guava Authors"
+SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+path = "third-party-notices/lmdbjava-0.9.3/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2016-2025 The LmdbJava Open Source Project"
+SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+path = "third-party-notices/logback-classic-1.6.5/**"
+precedence = "override"
+SPDX-FileCopyrightText = "1999-2024 QOS.ch"
+SPDX-License-Identifier = "EPL-2.0 OR LGPL-2.1-only"
+
+[[annotations]]
+path = "third-party-notices/logback-core-1.6.5/**"
+precedence = "override"
+SPDX-FileCopyrightText = "1999-2024 QOS.ch"
+SPDX-License-Identifier = "EPL-2.0 OR LGPL-2.1-only"
+
+[[annotations]]
+path = "third-party-notices/lwjgl-3.4.3/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2012-present Lightweight Java Game Library; 1996-2020 Anthony Green, Red Hat, Inc and others; 2020 Jens Axboe"
+SPDX-License-Identifier = "BSD-3-Clause AND MIT"
+
+[[annotations]]
+path = "third-party-notices/lwjgl-opencl-3.4.3/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2012-present Lightweight Java Game Library; 2013-2014 The Khronos Group Inc."
+SPDX-License-Identifier = "BSD-3-Clause AND MIT-Khronos-old"
+
+[[annotations]]
+path = "third-party-notices/native-0.9.33-5/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2016-2025 The LmdbJava Open Source Project; 2011-2021 Howard Chu, Symas Corp.; 2000-2021 The OpenLDAP Foundation; 2009, 2010 Martin Hedenfalk"
+SPDX-License-Identifier = "Apache-2.0 AND OLDAP-2.8 AND ISC"
+
+[[annotations]]
+path = "third-party-notices/protobuf-javalite-4.36.2/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2008 Google Inc."
+SPDX-License-Identifier = "BSD-3-Clause"
+
+[[annotations]]
+path = "third-party-notices/snakeyaml-2.5/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2008 SnakeYAML"
+SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+path = "third-party-notices/hashcat-2d71af37/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2015-2025 Jens Steube"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = "third-party-notices/secp256k1-v0.8.0/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2013, 2014 Pieter Wuille; 2020 Peter Dettman"
+SPDX-License-Identifier = "MIT"

@@ -2,7 +2,9 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
+# Template of bernardladenthin/actions (templates/common); the jobs are its reusable workflow.
 name: OSV-Scanner
+
 on:
   pull_request:
     branches: [ main ]
@@ -16,17 +18,8 @@ permissions:
   contents: read
 
 jobs:
-  scan-scheduled:
-    if: ${{ github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
-    uses: "google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@b1d267aea5211fa648d9d442fa64b90dbdcbdd36" # v2.7.0
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-
-  scan-pr:
-    if: ${{ github.event_name == 'pull_request' }}
-    uses: "google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@b1d267aea5211fa648d9d442fa64b90dbdcbdd36" # v2.7.0
+  scan:
+    uses: bernardladenthin/actions/.github/workflows/osv-scanner.yml@7646ab0603d75ee130463eceaa8988f7352e2d6a # v1.0.0
     permissions:
       actions: read
       contents: read
