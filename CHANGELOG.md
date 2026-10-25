@@ -218,6 +218,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Spotless formatter version -- is used in another version than in a sibling's default branch.
 
 ### Fixed
+- **The assembly profile could not be built on Windows at all.** The `collect-runtime-licenses`
+  execution passes a one-line Python program to `python3 -c`, and `exec-maven-plugin` drops the double
+  quotes out of that argument on Windows: `find_spec("actionlib")` reached Python as
+  `find_spec(actionlib)`, so the build died with `SyntaxError: '(' was never closed` before the fat jar
+  was assembled. The string literals are single-quoted now, which is valid Python and survives the
+  argument handling on both platforms. Measured with this plugin version: `print("x")` arrives as
+  `print(x)` and fails, `print('x')` arrives intact. Escaping as `\"` would fix Windows and break
+  Linux, where the argument reaches `execve` verbatim, so it is not an option; a comment at the
+  execution says so. The Linux CI never showed this. The identical construct in srcmorph's POM is
+  fixed in the same round.
 - **`examples/websocket_scanner.html` sends the block that holds "To".** The page treated "To" as
   exclusive, which only a script comment said: with an aligned "To" (the default included) the block
   containing the named key was never sent while "Range complete." was logged anyway, unlike the
