@@ -78,7 +78,7 @@ SPDX-License-Identifier: Apache-2.0
         <spotbugs.version>4.10.5.0</spotbugs.version>
         <fb-contrib.version>7.7.4</fb-contrib.version>
         <findsecbugs.version>1.14.0</findsecbugs.version>
-        <errorprone.version>2.50.0</errorprone.version>
+        <errorprone.version>2.51.0</errorprone.version>
         <nullaway.version>0.14.2</nullaway.version>
         <checker.version>4.3.1</checker.version>
         <java-websocket.version>1.6.0</java-websocket.version>
