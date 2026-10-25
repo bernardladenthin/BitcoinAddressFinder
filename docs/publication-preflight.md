@@ -49,8 +49,9 @@ uploads the frozen `publication-package/` as `signed-release-assets` or `signed-
 The preparation job exports `assets_complete: ${{ steps.finalize.outputs.complete }}`.
 
 The ref is checked twice. `check-snapshot` and `check-tag` run `publication.py check-ref --channel
-<channel>` before anything is built (`check-snapshot` only on a run that publishes: `main` carries
-the release version for the commit a release is tagged on). `prepare` repeats the check against
+<channel>` after the build and test jobs (they need `report`) and before anything is staged,
+signed or published (`check-snapshot` only on a run that publishes: `main` carries the release
+version for the commit a release is tagged on). `prepare` repeats the check against
 `GITHUB_REF` and refuses a channel the version does not have.
 
 The gate checks exact file membership, nonempty artifacts/signatures, cryptographic GPG
@@ -83,8 +84,8 @@ gate instead of silently staying behind. Gradle writes a SNAPSHOT with a timesta
 repository (`app-1.0-20261025.085646-1.aar` under `1.0-SNAPSHOT/`); the gate maps such a name back
 to `app-1.0-SNAPSHOT.aar`, the name the GitHub file and the Maven transfer use.
 
-`python3 .github/publication.py prepare <assets> <package> --config <file>` reads another contract,
-as `collect-release-assets.py --config` does.
+`python3 .github/publication.py prepare <assets> <package> --config <file>` reads another contract
+inside the repository (a path outside it is refused), as `collect-release-assets.py --config` does.
 
 ## Independent consumers
 
@@ -114,9 +115,10 @@ use `autoPublish=true` and `waitUntil=uploaded` for manual deployments.
 
 For snapshots, a transfer-only Maven POM invokes pinned `maven-deploy-plugin:3.1.4:deploy-file`
 executions during `validate`. The `central-snapshot` jobs of all runs share one concurrency group,
-and `upload --skip-superseded` skips the transfer when another dispatched run already transferred
-the snapshot of a newer commit (one that descends from this run's); Central serves the snapshot
-transferred last as the latest. The job reads the runs with `actions: read` and nothing else. Maven maintains snapshot timestamps and metadata; signatures are
+and `upload --skip-superseded` skips the transfer when one of the 30 most recent dispatched runs
+already transferred the snapshot of a newer commit (one that descends from this run's); Central serves the snapshot
+transferred last as the latest. The job reads the runs with `actions: read` and nothing else.
+Maven maintains snapshot timestamps and metadata; signatures are
 transferred in the same component request with their proper extensions. There are no source
 build phases. For a POM-only component its signature is the primary transfer artifact and the
 signed POM is supplied through `pomFile`, avoiding an empty-classifier parameter edge case.

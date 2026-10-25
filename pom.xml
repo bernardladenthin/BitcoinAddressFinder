@@ -42,6 +42,10 @@ SPDX-License-Identifier: Apache-2.0
     <properties>
         <license.python>python3</license.python>
         <sonar.organization>bernardladenthin</sonar.organization>
+        <!-- The Python build checks under .github are tested by unittest in the shared-files job of
+             publish.yml; no coverage report reaches Sonar for them, so counting them would only
+             ever show 0 %. Their issues are still analysed. -->
+        <sonar.coverage.exclusions>.github/**</sonar.coverage.exclusions>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <slf4j.version>2.0.20</slf4j.version>
         <logback.version>1.6.5</logback.version>

@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """Publication gate and transport invariants; no signing key or remote writes."""
+import base64
 import json
 import os
 from pathlib import Path
@@ -259,6 +260,15 @@ class PublicationTest(PublicationFixture):
         with self.assertRaisesRegex(ValueError, "GitHub would rename release asset: demo 1-SNAPSHOT.zip"):
             self.freeze()
 
+    def test_a_contract_outside_the_repository_is_refused(self):
+        outside = Path(self.tmp.name).parent / (Path(self.tmp.name).name + "-outside.json")
+        outside.write_text('{"schema":1}')
+        self.addCleanup(outside.unlink)
+        with self.assertRaisesRegex(ValueError, "outside the repository"):
+            self.freeze(config_path=outside)
+        with self.assertRaisesRegex(ValueError, "outside the repository"):
+            self.freeze(config_path="../" + outside.name)
+
     def test_prepare_reads_the_given_contract(self):
         other = self.root / "other.json"
         other.write_text(json.dumps({"schema": 1, "files": [{"source": "extra-{version}.txt"}]}))
@@ -320,8 +330,9 @@ class UploadTest(PublicationFixture):
         self.assertNotIn("local/test/demo/1.2.3/demo-1.2.3.jar.asc.md5", seen["names"])
         self.assertFalse(any(name.startswith("github/") or name == "manifest.json" for name in seen["names"]))
         self.assertEqual(seen["jar"], (package / "github/demo-1.2.3.jar").read_bytes())
-        self.assertIn("Authorization: Bearer dXNlcjpzZWNyZXQ=", seen["config"])
-        self.assertFalse(any("secret" in arg or "dXNlcjpzZWNyZXQ" in arg for arg in seen["args"]))
+        token = base64.b64encode(b"user:secret").decode()  # the fixture's MAVEN_USERNAME/PASSWORD
+        self.assertIn("Authorization: Bearer " + token, seen["config"])
+        self.assertFalse(any("secret" in arg or token in arg for arg in seen["args"]))
         self.assertTrue(seen["args"][-1].endswith("?publishingType=AUTOMATIC"))
 
     def test_release_upload_without_a_valid_receipt_fails(self):

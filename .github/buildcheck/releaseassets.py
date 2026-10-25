@@ -30,8 +30,15 @@ def _inside(root, relative):
 
 
 def configuration(root, path=None):
-    """Read the explicit contract; unknown keys fail instead of silently dropping assets."""
-    path = Path(path) if path is not None else Path(root) / ".github/release-assets.json"
+    """Read the explicit contract; unknown keys fail instead of silently dropping assets.
+
+    The contract is part of the repository: a relative --config is relative to the repository root,
+    and a path outside the repository is refused.
+    """
+    root = Path(root).resolve()
+    path = (root / (path if path is not None else ".github/release-assets.json")).resolve()
+    if not path.is_relative_to(root):
+        raise ValueError(f"release asset configuration outside the repository: {path}")
     config = json.loads(path.read_text())
     _keys(config, ("schema", "maven", "files", "publication"), "release asset configuration")
     if type(config.get("schema")) is not int or config["schema"] != 1:

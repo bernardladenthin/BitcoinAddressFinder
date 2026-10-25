@@ -274,11 +274,12 @@ def snapshot_pom(package, destination, url=SNAPSHOTS):
 
 
 def superseded(repository, sha, run_id, github=None):
-    """True when another publish run already transferred the snapshot of a newer commit.
+    """True when one of the 30 most recent dispatched runs transferred the snapshot of a newer commit.
 
     The central-snapshot jobs of all runs share one concurrency group, so a newer run's transfer
     either finished before this check or starts after this transfer: Maven Central serves the
-    snapshot transferred last as the latest one.
+    snapshot transferred last as the latest one. Snapshots are published by dispatch only, so the
+    window of 30 runs reaches back far beyond any transfer still waiting in that group.
     """
     gh = github or GitHub()
     repo = f"repos/{repository}"

@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Releases and snapshots are published through one local gate.** The publish jobs stage and sign
+  everything, `publication.py prepare` checks the exact file set, every signature and the version
+  against the tag (`v<version>`, no `-SNAPSHOT`; `check-tag` / `check-snapshot` check it first), and
+  freezes the result; the GitHub release, the Maven Central transfer and the provenance attestation
+  are independent jobs on that frozen package, so a Central outage no longer hides the GitHub files and
+  nothing is attached before the gate has passed. Builds run on JDK 25 (`.java-version`); the
+  published bytecode target is unchanged. Every published jar carries `LICENSE` and `THIRD_PARTY.md`
+  under `META-INF/third-party/`.
+- **The unused AGPL OpenCL kernels are gone** (`unused/calc_addrs.cl`, `unused/calc_addrs_fix_zero.cl`,
+  `unused/gpu.cl`, shipped in the jars up to 1.8.0 but never loaded), with the disabled test that
+  reproduced their index arithmetic. The fat jar now carries the legal files of its dependencies under
+  `META-INF/third-party/dependencies/` and an `inventory.json`; the fat-jar smoke also runs on Java 21,
+  the release the jar is compiled for.
 - Build tooling bumped in step with the sibling repositories: `anthropics/claude-code-action` v1.0.258,
   `github/codeql-action` v4.39.1 and `actions/setup-python` v7.1.0 (measurement-tools workflow).
   maven-clean-plugin 3.5.0, maven-resources-plugin 3.5.0, maven-install-plugin 3.2.0, maven-deploy-plugin
