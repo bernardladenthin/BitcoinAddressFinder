@@ -8,7 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
-- **`bernardladenthin/actions` pinned at v1.0.3.** v1.0.3 makes the snapshot publication survive
+- **`bernardladenthin/actions` pinned at v1.1.0.** v1.1.0 adds `java/audit-publication`, an audit of a
+  published release from the outside (not used here yet); nothing changes for the actions in use.
+  v1.0.3 before it made the snapshot publication survive
   GitHub: the Central snapshot transfer lists the jobs of older runs 50 per page and repeats GitHub
   reads on a server error, and a refused move of the `snapshot` tag deletes and re-creates it (both
   failed in java-llama.cpp's first snapshot dispatch on v1.0.1). v1.0.2 before it carried a
