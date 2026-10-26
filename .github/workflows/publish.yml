@@ -77,15 +77,15 @@ jobs:
         with:
           persist-credentials: false
       - name: Files equal their templates in bernardladenthin/actions
-        uses: bernardladenthin/actions/common/check-templates@23543c8554ca9de6792a1b8d8aae0bcd001d8508 # v1.0.3
+        uses: bernardladenthin/actions/common/check-templates@44390bd464395f560f4170d2c4bfb7a6348541b3 # v1.1.0
       - name: Release gate (every job gates both publish jobs, or release-gate-exemptions.txt says why)
-        uses: bernardladenthin/actions/common/check-release-gate@23543c8554ca9de6792a1b8d8aae0bcd001d8508 # v1.0.3
+        uses: bernardladenthin/actions/common/check-release-gate@44390bd464395f560f4170d2c4bfb7a6348541b3 # v1.1.0
       - name: Run scripts parse (bash -n over every bash run script of the workflows and actions)
-        uses: bernardladenthin/actions/common/check-run-scripts@23543c8554ca9de6792a1b8d8aae0bcd001d8508 # v1.0.3
+        uses: bernardladenthin/actions/common/check-run-scripts@44390bd464395f560f4170d2c4bfb7a6348541b3 # v1.1.0
       - name: Maven versions (warns where a dependency or plugin differs from a sibling repository)
-        uses: bernardladenthin/actions/java/check-maven-versions@23543c8554ca9de6792a1b8d8aae0bcd001d8508 # v1.0.3
+        uses: bernardladenthin/actions/java/check-maven-versions@44390bd464395f560f4170d2c4bfb7a6348541b3 # v1.1.0
       - name: Publication wiring and release asset contract (dry run)
-        uses: bernardladenthin/actions/java/check-publication@23543c8554ca9de6792a1b8d8aae0bcd001d8508 # v1.0.3
+        uses: bernardladenthin/actions/java/check-publication@44390bd464395f560f4170d2c4bfb7a6348541b3 # v1.1.0
 
   # ---------------------------------------------------------------------------
   # GPG signing-key preflight (standalone, no `needs:` -- runs in parallel at the
@@ -101,7 +101,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: maven-central
     steps:
-      - uses: bernardladenthin/actions/common/verify-gpg-key@23543c8554ca9de6792a1b8d8aae0bcd001d8508 # v1.0.3
+      - uses: bernardladenthin/actions/common/verify-gpg-key@44390bd464395f560f4170d2c4bfb7a6348541b3 # v1.1.0
         with:
           private-key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
@@ -121,7 +121,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: bernardladenthin/actions/java/verify-signing-key-gradle@23543c8554ca9de6792a1b8d8aae0bcd001d8508 # v1.0.3
+      - uses: bernardladenthin/actions/java/verify-signing-key-gradle@44390bd464395f560f4170d2c4bfb7a6348541b3 # v1.1.0
         with:
           private-key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
@@ -135,7 +135,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: bernardladenthin/actions/java/maven-code-style@23543c8554ca9de6792a1b8d8aae0bcd001d8508 # v1.0.3
+      - uses: bernardladenthin/actions/java/maven-code-style@44390bd464395f560f4170d2c4bfb7a6348541b3 # v1.1.0
         with:
           package-pattern: 'net\.ladenthin\.'
 
@@ -150,7 +150,7 @@ jobs:
           java-version-file: .java-version
           distribution: temurin
           cache: maven
-      - uses: bernardladenthin/actions/common/setup@23543c8554ca9de6792a1b8d8aae0bcd001d8508 # v1.0.3
+      - uses: bernardladenthin/actions/common/setup@44390bd464395f560f4170d2c4bfb7a6348541b3 # v1.1.0
       - name: Build
         # -Dmaven.javadoc.skip=true is REQUIRED here and is the ONLY surviving javadoc
         # skip across all four sibling repos (do not remove without the full-build check
@@ -179,7 +179,7 @@ jobs:
       # Echo the crash logs into the job log (workspace/policies/ci-test-diagnostics.md 3.1).
       - name: Print crash logs (on failure)
         if: failure()
-        uses: bernardladenthin/actions/java/print-crash-logs@23543c8554ca9de6792a1b8d8aae0bcd001d8508 # v1.0.3
+        uses: bernardladenthin/actions/java/print-crash-logs@44390bd464395f560f4170d2c4bfb7a6348541b3 # v1.1.0
         with:
           modules: .
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
@@ -206,7 +206,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Display CPU Info
-        uses: bernardladenthin/actions/common/print-host-info@23543c8554ca9de6792a1b8d8aae0bcd001d8508 # v1.0.3
+        uses: bernardladenthin/actions/common/print-host-info@44390bd464395f560f4170d2c4bfb7a6348541b3 # v1.1.0
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with:
           java-version-file: .java-version
@@ -221,7 +221,7 @@ jobs:
       # Echo the crash logs into the job log (workspace/policies/ci-test-diagnostics.md 3.1).
       - name: Print crash logs (on failure)
         if: failure()
-        uses: bernardladenthin/actions/java/print-crash-logs@23543c8554ca9de6792a1b8d8aae0bcd001d8508 # v1.0.3
+        uses: bernardladenthin/actions/java/print-crash-logs@44390bd464395f560f4170d2c4bfb7a6348541b3 # v1.1.0
         with:
           modules: .
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
@@ -270,7 +270,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Display CPU Info
-        uses: bernardladenthin/actions/common/print-host-info@23543c8554ca9de6792a1b8d8aae0bcd001d8508 # v1.0.3
+        uses: bernardladenthin/actions/common/print-host-info@44390bd464395f560f4170d2c4bfb7a6348541b3 # v1.1.0
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with:
           java-version-file: .java-version
@@ -334,7 +334,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Display CPU Info
-        uses: bernardladenthin/actions/common/print-host-info@23543c8554ca9de6792a1b8d8aae0bcd001d8508 # v1.0.3
+        uses: bernardladenthin/actions/common/print-host-info@44390bd464395f560f4170d2c4bfb7a6348541b3 # v1.1.0
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with:
           java-version-file: .java-version
@@ -394,7 +394,7 @@ jobs:
       # hs_err + surefire dumps: the shared step of every other test job.
       - name: Dump native crash logs (on failure)
         if: ${{ failure() }}
-        uses: bernardladenthin/actions/java/print-crash-logs@23543c8554ca9de6792a1b8d8aae0bcd001d8508 # v1.0.3
+        uses: bernardladenthin/actions/java/print-crash-logs@44390bd464395f560f4170d2c4bfb7a6348541b3 # v1.1.0
       - name: Dump OpenCL surefire reports (on failure)
         if: ${{ failure() }}
         shell: bash
@@ -454,13 +454,13 @@ jobs:
       # 65 = Java 21, this project's target -- deliberately NOT the 52 the Java 8 siblings use.
       # That is why the ceiling is an argument: it belongs next to the release it describes.
       - name: Verify Java 21 bytecode (no class newer than major 65)
-        uses: bernardladenthin/actions/java/verify-bytecode@23543c8554ca9de6792a1b8d8aae0bcd001d8508 # v1.0.3
+        uses: bernardladenthin/actions/java/verify-bytecode@44390bd464395f560f4170d2c4bfb7a6348541b3 # v1.1.0
         with:
           max-major: "65"
           paths: |
             fatjar
       - name: Run fat-jar smoke test
-        uses: bernardladenthin/actions/java/smoke-fatjar-cli@23543c8554ca9de6792a1b8d8aae0bcd001d8508 # v1.0.3
+        uses: bernardladenthin/actions/java/smoke-fatjar-cli@44390bd464395f560f4170d2c4bfb7a6348541b3 # v1.1.0
         with:
           jar-dir: fatjar
           jar-glob: 'bitcoinaddressfinder-*-jar-with-dependencies.jar'
@@ -477,7 +477,7 @@ jobs:
           java -version
           rm -rf examples/lmdb
       - name: Run the same fat jar on Java 21
-        uses: bernardladenthin/actions/java/smoke-fatjar-cli@23543c8554ca9de6792a1b8d8aae0bcd001d8508 # v1.0.3
+        uses: bernardladenthin/actions/java/smoke-fatjar-cli@44390bd464395f560f4170d2c4bfb7a6348541b3 # v1.1.0
         with:
           jar-dir: fatjar
           jar-glob: 'bitcoinaddressfinder-*-jar-with-dependencies.jar'
@@ -542,7 +542,7 @@ jobs:
       # a release is tagged on.
       - name: Require a SNAPSHOT version
         if: inputs.publish_to_central
-        uses: bernardladenthin/actions/java/check-release-ref@23543c8554ca9de6792a1b8d8aae0bcd001d8508 # v1.0.3
+        uses: bernardladenthin/actions/java/check-release-ref@44390bd464395f560f4170d2c4bfb7a6348541b3 # v1.1.0
         with:
           channel: snapshot
 
@@ -557,7 +557,7 @@ jobs:
           persist-credentials: false
       # The tag names exactly the project version (v1.2.3 for 1.2.3), which is no SNAPSHOT.
       - name: Require the release version the tag names
-        uses: bernardladenthin/actions/java/check-release-ref@23543c8554ca9de6792a1b8d8aae0bcd001d8508 # v1.0.3
+        uses: bernardladenthin/actions/java/check-release-ref@44390bd464395f560f4170d2c4bfb7a6348541b3 # v1.1.0
         with:
           channel: release
 
@@ -606,7 +606,7 @@ jobs:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
       # actionlib on PYTHONPATH and ACTIONS_DIR for the steps below: the preservation and the license
       # collector the assembly profile runs.
-      - uses: bernardladenthin/actions/common/setup@23543c8554ca9de6792a1b8d8aae0bcd001d8508 # v1.0.3
+      - uses: bernardladenthin/actions/common/setup@44390bd464395f560f4170d2c4bfb7a6348541b3 # v1.1.0
       - name: Preserve signed Central outputs before the fat jar rebuild
         run: python3 -m actionlib.java.releaseassets central-assets --maven-only
       - name: "Build & sign fat jar (GitHub asset only \u2014 not deployed to Central)"
@@ -615,7 +615,7 @@ jobs:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
       - name: Finalize and secure the signed publication
         id: finalize
-        uses: bernardladenthin/actions/java/finalize-publication@23543c8554ca9de6792a1b8d8aae0bcd001d8508 # v1.0.3
+        uses: bernardladenthin/actions/java/finalize-publication@44390bd464395f560f4170d2c4bfb7a6348541b3 # v1.1.0
         with:
           channel: snapshot
           maven-assets: central-assets
@@ -632,7 +632,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: bernardladenthin/actions/java/publish-github@23543c8554ca9de6792a1b8d8aae0bcd001d8508 # v1.0.3
+      - uses: bernardladenthin/actions/java/publish-github@44390bd464395f560f4170d2c4bfb7a6348541b3 # v1.1.0
         with:
           channel: snapshot
           assets-complete: ${{ needs.publish-snapshot.outputs.assets_complete }}
@@ -674,7 +674,7 @@ jobs:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
       # actionlib on PYTHONPATH and ACTIONS_DIR for the steps below: the preservation and the license
       # collector the assembly profile runs.
-      - uses: bernardladenthin/actions/common/setup@23543c8554ca9de6792a1b8d8aae0bcd001d8508 # v1.0.3
+      - uses: bernardladenthin/actions/common/setup@44390bd464395f560f4170d2c4bfb7a6348541b3 # v1.1.0
       - name: Preserve signed Central outputs before the fat jar rebuild
         run: python3 -m actionlib.java.releaseassets central-assets --maven-only
       - name: "Build & sign fat jar (GitHub asset only \u2014 not deployed to Central)"
@@ -683,7 +683,7 @@ jobs:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
       - name: Finalize and secure the signed publication
         id: finalize
-        uses: bernardladenthin/actions/java/finalize-publication@23543c8554ca9de6792a1b8d8aae0bcd001d8508 # v1.0.3
+        uses: bernardladenthin/actions/java/finalize-publication@44390bd464395f560f4170d2c4bfb7a6348541b3 # v1.1.0
         with:
           channel: release
           maven-assets: central-assets
@@ -697,7 +697,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: bernardladenthin/actions/java/publish-github@23543c8554ca9de6792a1b8d8aae0bcd001d8508 # v1.0.3
+      - uses: bernardladenthin/actions/java/publish-github@44390bd464395f560f4170d2c4bfb7a6348541b3 # v1.1.0
         with:
           channel: release
           assets-complete: ${{ needs.publish-release.outputs.assets_complete }}
@@ -722,7 +722,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Transfer frozen artifacts (no rebuild, signing or validation polling)
-        uses: bernardladenthin/actions/java/publish-central@23543c8554ca9de6792a1b8d8aae0bcd001d8508 # v1.0.3
+        uses: bernardladenthin/actions/java/publish-central@44390bd464395f560f4170d2c4bfb7a6348541b3 # v1.1.0
         with:
           channel: snapshot
           assets-complete: ${{ needs.publish-snapshot.outputs.assets_complete }}
@@ -743,7 +743,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Transfer frozen artifacts (no rebuild, signing or validation polling)
-        uses: bernardladenthin/actions/java/publish-central@23543c8554ca9de6792a1b8d8aae0bcd001d8508 # v1.0.3
+        uses: bernardladenthin/actions/java/publish-central@44390bd464395f560f4170d2c4bfb7a6348541b3 # v1.1.0
         with:
           channel: release
           assets-complete: ${{ needs.publish-release.outputs.assets_complete }}
@@ -761,7 +761,7 @@ jobs:
       id-token: write
       attestations: write
     steps:
-      - uses: bernardladenthin/actions/java/attest-publication@23543c8554ca9de6792a1b8d8aae0bcd001d8508 # v1.0.3
+      - uses: bernardladenthin/actions/java/attest-publication@44390bd464395f560f4170d2c4bfb7a6348541b3 # v1.1.0
         with:
           channel: snapshot
           assets-complete: ${{ needs.publish-snapshot.outputs.assets_complete }}
@@ -777,7 +777,7 @@ jobs:
       id-token: write
       attestations: write
     steps:
-      - uses: bernardladenthin/actions/java/attest-publication@23543c8554ca9de6792a1b8d8aae0bcd001d8508 # v1.0.3
+      - uses: bernardladenthin/actions/java/attest-publication@44390bd464395f560f4170d2c4bfb7a6348541b3 # v1.1.0
         with:
           channel: release
           assets-complete: ${{ needs.publish-release.outputs.assets_complete }}
