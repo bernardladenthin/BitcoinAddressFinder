@@ -731,34 +731,30 @@ counted as a client), the `KeyProducerJavaZmqTest` hang is guarded (F218).
   on Linux under load only (10 of 10 green). Open: confirm on the Windows CI job that a stall now ends
   as a failure of one test or heals, not as a fork timeout. The cause is the jeromq poller race above;
   its fix is [zeromq/jeromq#1022](https://github.com/zeromq/jeromq/pull/1022).
-- **`claude-review` (`claude-code-review.yml`) fails on every PR** — #387 … #393 all red, the action
-  ends after well under a second with `is_error: true`, `total_cost_usd: 0` and empty `modelUsage`,
-  i.e. no model call was made. Points at the action's token/credit, not at the PRs. Check the
-  `ANTHROPIC_API_KEY` secret and the credit of the account behind it.
+- **`claude-review` (`claude-code-review.yml`) fails on every PR** — the same in all four
+  repositories; tracked once in [`../workspace/crossrepostatus.md`](../workspace/crossrepostatus.md)
+  ("Open cross-repo items"). Still red on 2026-10-28.
 
 ## Open — cross-cutting (slice for this repo)
 
 - **jqwik pin policy** — see [`../workspace/policies/jqwik-prompt-injection.md`](../workspace/policies/jqwik-prompt-injection.md). `jqwik.version ≤ 1.9.3` is mandatory.
 
-- **`@VisibleForTesting` audit.** 10 sites remaining (down from 19 — see workspace `crossrepostatus.md` for the site-by-site audit). All 10 are legitimate per the design-fit review; no further cleanup recommended unless the source moves.
+- **`@VisibleForTesting` audit — outdated, re-audit.** The design-fit review once left 10 legitimate sites (down from 19); on 2026-10-28 `src/main/java` carries **80** annotated sites (imports not counted), so the earlier verdict no longer describes the code. Re-run the review of [`../workspace/policies/code-quality-todos.md`](../workspace/policies/code-quality-todos.md) on the current sites.
 
 - **Null-safety further refinement.** JSpecify + NullAway are enforced at compile time in **strict JSpecify mode** with the extra options `CheckOptionalEmptiness`, `AcknowledgeRestrictiveAnnotations`, `AcknowledgeAndroidRecent`, `AssertsEnabled` (see `pom.xml`). Every package carries an explicit `@NullMarked` via `package-info.java` so the convention is visible to non-NullAway tools (IDEs, Kotlin, Checker Framework). The 50 `@Nullable` sites currently in the codebase are all legitimate. `OpenCLContext.getOpenClTask()` returns `Optional<OpenClTask>` rather than `@Nullable OpenClTask` to surface the lifecycle state in the type. Open follow-up: review any future-added public API surfaces for places where `@Nullable` would be more precise than the implicit non-null default; consider whether further `@Nullable T` returns should migrate to `Optional<T>` on a case-by-case basis (the project's established convention is `@Nullable`; Optional is used selectively for lifecycle-shaped APIs).
 
-- **Mutation-testing threshold expansion** — the gate now covers a verified-100% **15-class** list (`util.BitHelper` + `util.PrivateKeyTooLargeException` + `model.PublicKeyBytes`/`AddressToCoin`/`AddressType` + the 8 custom exceptions + `statistics.Statistics`/`ReadStatistic` + `configuration.CKeyProducerJavaIncremental`; 65 mutations, pitest-maven 1.25.4). The earlier `net.ladenthin.bitcoinaddressfinder.BitHelper` target was stale (BitHelper moved to `util/` in the restructure → gate matched nothing) and has been fixed. `model.Hash160` is deliberately excluded (its fast/slow hash paths are identical, so the `if(useFast)` negate mutant is equivalent). Still open (optional): config getters covered only by producer/keyproducer integration tests, and the larger orchestration classes (producer / consumer / engine / opencl) which need heavier fixtures.
-
-- **Additional ArchUnit rules to consider** — public-fields-final, `noTestFrameworksInProduction`, `loggersArePrivateStaticFinal`, `noPackageCycles`, the full **`layeredArchitecture()`** rule, **per-module banned-imports** (`joclConfinedToOpencl`, `networkInputLibsConfinedToKeyproducer`, `lmdbConfinedToPersistenceAndIo`), and the **no-public-mutable-static-state** rule (`noPublicMutableStaticFields` — public static fields must be final; 0 violations, pure drift-guard) are all DONE. No further ArchUnit rules open.
+- **Mutation-testing threshold expansion** — the gate covers a verified-100% **16-class** list (`pom.xml`, `targetClasses`: `util.BitHelper` + `util.PrivateKeyTooLargeException` + `model.PublicKeyBytes`/`AddressToCoin`/`AddressType`/`Hash160` + the 7 custom exceptions + `statistics.Statistics`/`ReadStatistic` + `configuration.CKeyProducerJavaIncremental`; checked 2026-10-28). Still open (optional): config getters covered only by producer/keyproducer integration tests, and the larger orchestration classes (producer / consumer / engine / opencl) which need heavier fixtures.
 
 - **Cross-repo code-quality TODOs** — see [`../workspace/policies/code-quality-todos.md`](../workspace/policies/code-quality-todos.md) for the canonical `@VisibleForTesting` design-fit review (BAF site-by-site audit captured in [`../workspace/crossrepostatus.md`](../workspace/crossrepostatus.md)), package hierarchy review, and class/method naming review.
 
 - **Drop the catch-rethrow `THROWS_METHOD_THROWS_RUNTIMEEXCEPTION`
-  suppression in `spotbugs-exclude.xml`** once a SpotBugs release
-  ships with [PR #4087](https://github.com/spotbugs/spotbugs/pull/4087)
-  merged. That PR fixes the detector to match the exception-handler
-  ASTORE register against the local variable being thrown, so the
-  catch-then-rethrow-of-the-same-RuntimeException pattern on
-  `AbstractProducer.produceKeys` and `LMDBPersistence.addresses` will
-  stop firing the warning. Tracking issue:
-  [spotbugs/spotbugs#3918](https://github.com/spotbugs/spotbugs/issues/3918).
+  suppression in `spotbugs-exclude.xml`** once a SpotBugs release fixes
+  [spotbugs/spotbugs#3918](https://github.com/spotbugs/spotbugs/issues/3918) (still open). The
+  fix this item waited for, [PR #4087](https://github.com/spotbugs/spotbugs/pull/4087) (match the
+  exception-handler ASTORE register against the local variable being thrown), was closed unmerged
+  on 2026-06-23, so the catch-then-rethrow-of-the-same-RuntimeException pattern on
+  `AbstractProducer.produceKeys` and `LMDBPersistence.addresses` keeps firing until another fix
+  lands. `spotbugs-exclude.xml` still names the PR; point it at the issue when touching it.
   Verification when removing the suppression: run `mvn spotbugs:check`
   and confirm zero `THROWS_METHOD_THROWS_RUNTIMEEXCEPTION` findings on
   those two methods.
@@ -766,7 +762,7 @@ counted as a client), the `KeyProducerJavaZmqTest` hang is guarded (F218).
 - **(Unblocked, optional) Drop the project-wide `OPM_OVERLY_PERMISSIVE_METHOD`
   suppression in `spotbugs-exclude.xml`.** The package-architecture refactor it
   was waiting on has now landed (the single root package was split into the
-  layered packages — see "Done" history below), so cross-layer call sites are
+  layered packages), so cross-layer call sites are
   now stable and OPM findings would be actionable signals rather than
   correct-but-unstable noise. Re-enabling is **optional**: visibility
   minimisation is not a project goal (the original tightening pressure was
