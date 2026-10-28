@@ -88,16 +88,19 @@ jobs:
         uses: bernardladenthin/actions/java/check-publication@44390bd464395f560f4170d2c4bfb7a6348541b3 # v1.1.0
 
   # ---------------------------------------------------------------------------
-  # GPG signing-key preflight (standalone, no `needs:` -- runs in parallel at the
-  # very start on every trigger): what maven-gpg-plugin does at deploy time, so a
+  # GPG signing-key preflight: what maven-gpg-plugin does at deploy time, so a
   # bad/expired key or wrong passphrase is caught in ~20s instead of failing the
-  # publish stage. `environment: maven-central` gives it the SAME secret the publish
-  # jobs use. EXPECTED to go RED where the secret is not delivered (fork PRs, other
-  # contributors' branches): "this ref cannot sign a release", not a regression.
-  # Prints only public key metadata; the security notes are in the action's script.
+  # publish stage. Only on a publishing dispatch (`publish_to_central`, the condition
+  # of both publish jobs, which need it), with no `needs:` of its own, so it runs at
+  # the very start. `environment: maven-central` gives it the SAME secret the publish
+  # jobs use; that environment admits only `main` and `v*` tags. Until 2026-10 the job
+  # ran on every trigger: red on every pull request ("this ref cannot sign"), and on a
+  # push to `main` it sat out the environment's wait timer for a run that publishes
+  # nothing. Prints only public key metadata; the security notes are in the action's script.
   # ---------------------------------------------------------------------------
   verify-signing-key:
     name: Verify GPG signing key (no secrets printed)
+    if: inputs.publish_to_central
     runs-on: ubuntu-latest
     environment: maven-central
     steps:
@@ -111,10 +114,11 @@ jobs:
   # the path a Gradle publication (an Android AAR) signs with. BouncyCastle parses the
   # armored key more strictly than gpg, so it catches what the job above tolerates.
   # It signs the action's own throwaway project, so it is the same in every repository
-  # ("prepared for Gradle"). Red by design where the secret is not delivered.
+  # ("prepared for Gradle"). Same trigger and gating as the job above.
   # ---------------------------------------------------------------------------
   verify-signing-key-gradle:
     name: Verify GPG signing key — Gradle/BouncyCastle path (no secrets printed)
+    if: inputs.publish_to_central
     runs-on: ubuntu-latest
     environment: maven-central
     steps:
@@ -565,6 +569,8 @@ jobs:
     name: Prepare and verify signed snapshot artifacts
     needs:
       - check-snapshot
+      - verify-signing-key
+      - verify-signing-key-gradle
       - code-style
       - smoke-fatjar
       - repository-checks
@@ -642,6 +648,8 @@ jobs:
     name: Prepare and verify signed release artifacts
     needs:
       - check-tag
+      - verify-signing-key
+      - verify-signing-key-gradle
       - code-style
       - smoke-fatjar
       - repository-checks

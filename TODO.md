@@ -11,15 +11,6 @@ so everything below is genuinely still open.
 
 ## Open — BAF-specific
 
-### The first snapshot on bernardladenthin/actions v1.1.0
-
-No snapshot has been published since the pin bumps: the push run on `main`
-([40311605489](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/runs/40311605489),
-`df9491d5`) skipped every snapshot job. Dispatch Publish on `main` with `publish_to_central`
-(the owner approves `maven-central`) and read `central-snapshot` and `github-snapshot`: does the
-`snapshot` tag move to the commit (actions v1.0.3+ re-creates it on a 403), and does
-`superseded()` pass without a 502 (java-llama.cpp's TODO has the background).
-
 ### Fat jar license texts — the owner's open points (from the review of 2026-10-25)
 
 `third-party-notices/` supplies the texts the bundled jars lack (`SOURCES.tsv` names each source).

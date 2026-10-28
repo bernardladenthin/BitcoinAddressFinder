@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **The GPG signing-key preflight runs only when something is published.** The two jobs
+  `verify-signing-key` and `verify-signing-key-gradle` ran on every trigger: red on every pull request,
+  because the `maven-central` environment admits only `main` and `v*` tags, and on a push to `main`
+  they sat out the environment's wait timer for a run that publishes nothing. They run now on a
+  `publish_to_central` dispatch only, still at the start of the run, and both publish jobs need them
+  (no longer an exemption of the release gate).
 - **`bernardladenthin/actions` pinned at v1.1.0.** v1.1.0 adds `java/audit-publication`, an audit of a
   published release from the outside (not used here yet); nothing changes for the actions in use.
   v1.0.3 before it made the snapshot publication survive
