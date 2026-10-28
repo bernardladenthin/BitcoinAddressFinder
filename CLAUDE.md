@@ -611,7 +611,7 @@ No other sibling repo has OpenCL code, so this distinction is BAF-only.
 | `jeromq` | 0.6.0 | ZeroMQ producer |
 | `jspecify` | 1.0.1 | Nullness annotations |
 | `slf4j-api` | 2.0.20 | Logging facade |
-| `logback-classic` | 1.6.5 | SLF4J implementation |
+| `logback-classic` | 1.6.6 | SLF4J implementation |
 
 Test-only:
 | `junit-jupiter` | 6.1.3 | JUnit 6 (Jupiter) test framework |
