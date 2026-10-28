@@ -156,14 +156,14 @@
       ]
     },
     {
-      "directory": "logback-classic-1.6.5",
+      "directory": "logback-classic-1.6.6",
       "license": "EPL-2.0 OR LGPL-2.1-only",
       "artifacts": [
         "logback-classic"
       ]
     },
     {
-      "directory": "logback-core-1.6.5",
+      "directory": "logback-core-1.6.6",
       "license": "EPL-2.0 OR LGPL-2.1-only",
       "artifacts": [
         "logback-core"

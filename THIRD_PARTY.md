@@ -6,7 +6,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 # Third-party license and attribution notes
 
-The project is Apache-2.0. Runtime dependencies include Logback Classic 1.6.5,
+The project is Apache-2.0. Runtime dependencies include Logback Classic 1.6.6,
 JeroMQ 0.6.0, Bouncy Castle 1.86, jsr305 3.0.2 and jcip-annotations 1.0.
 The annotation sources contain CC-BY-2.5 despite the Apache declaration in jsr305's POM.
 See the bundled annotation attribution and CC-BY-2.5 text under META-INF.

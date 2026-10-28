@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Dependencies and build plugins:** logback-classic 1.6.6, NullAway 0.14.3, maven-surefire-plugin
+  3.6.1, jacoco-maven-plugin 0.8.16, palantir-java-format 2.103.0 (no formatting change) and
+  `anthropics/claude-code-action` v1.0.264. The license notices shipped for logback name 1.6.6 now; the
+  license text is unchanged (same SHA-256 at the `v_1.6.6` tag).
 - **The GPG signing-key preflight runs only when something is published.** The two jobs
   `verify-signing-key` and `verify-signing-key-gradle` ran on every trigger: red on every pull request,
   because the `maven-central` environment admits only `main` and `v*` tags, and on a push to `main`

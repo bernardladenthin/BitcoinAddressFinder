@@ -52,7 +52,7 @@ SPDX-License-Identifier: Apache-2.0
         <sonar.coverage.exclusions>.github/**</sonar.coverage.exclusions>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <slf4j.version>2.0.20</slf4j.version>
-        <logback.version>1.6.5</logback.version>
+        <logback.version>1.6.6</logback.version>
         <project.build.outputTimestamp>2026-09-01T07:58:47Z</project.build.outputTimestamp>
         <!-- Test JVM heap: -Xmx2g cap, no eager -Xms. With reuseForks=false a fresh JVM is
              spawned per test class (~180 sequential spawns); an eager -Xms1g committed 1 GB up
@@ -79,7 +79,7 @@ SPDX-License-Identifier: Apache-2.0
         <fb-contrib.version>7.7.4</fb-contrib.version>
         <findsecbugs.version>1.14.0</findsecbugs.version>
         <errorprone.version>2.51.0</errorprone.version>
-        <nullaway.version>0.14.2</nullaway.version>
+        <nullaway.version>0.14.3</nullaway.version>
         <checker.version>4.3.1</checker.version>
         <java-websocket.version>1.6.0</java-websocket.version>
         <jeromq.version>0.6.0</jeromq.version>
@@ -116,7 +116,7 @@ SPDX-License-Identifier: Apache-2.0
         <log4j.version>2.26.1</log4j.version>
         <jmh.version>1.37</jmh.version>
         <spotless.version>3.10.4</spotless.version>
-        <palantir-java-format.version>2.102.0</palantir-java-format.version>
+        <palantir-java-format.version>2.103.0</palantir-java-format.version>
     </properties>
 
     <!--
@@ -284,7 +284,7 @@ SPDX-License-Identifier: Apache-2.0
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
-                    <version>3.6.0</version>
+                    <version>3.6.1</version>
                     <configuration>
                         <!--
                             Tests in the `vmlens` package are meaningful only under the vmlens
@@ -308,7 +308,7 @@ SPDX-License-Identifier: Apache-2.0
                 <plugin>
                     <groupId>org.jacoco</groupId>
                     <artifactId>jacoco-maven-plugin</artifactId>
-                    <version>0.8.15</version>
+                    <version>0.8.16</version>
                 </plugin>
                 <plugin>
                     <groupId>org.pitest</groupId>

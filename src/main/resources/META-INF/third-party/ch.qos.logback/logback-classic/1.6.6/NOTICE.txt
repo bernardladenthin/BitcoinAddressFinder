@@ -1,12 +1,12 @@
-Logback Classic 1.6.5
+Logback Classic 1.6.6
 Copyright (C) 1999-2026, QOS.ch. All rights reserved.
 
 The original AsyncAppender.java and BasicConfigurator.java headers explicitly grant
 EPL-2.0 OR LGPL-2.1 at the licensee's choice. This distribution selects EPL-2.0
 for the unchanged component under that grant. The full EPL text is in META-INF/third-party/licenses/EPL-2.0.txt.
 Upstream sources (including any other file-level notices):
-https://repo.maven.apache.org/maven2/ch/qos/logback/logback-classic/1.6.5/logback-classic-1.6.5-sources.jar
+https://repo.maven.apache.org/maven2/ch/qos/logback/logback-classic/1.6.6/logback-classic-1.6.6-sources.jar
 
-Logback Core 1.6.5 is distributed alongside Classic.
+Logback Core 1.6.6 is distributed alongside Classic.
 Source with original copyright and file-level license notices:
-https://repo.maven.apache.org/maven2/ch/qos/logback/logback-core/1.6.5/logback-core-1.6.5-sources.jar
+https://repo.maven.apache.org/maven2/ch/qos/logback/logback-core/1.6.6/logback-core-1.6.6-sources.jar

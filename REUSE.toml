@@ -283,13 +283,13 @@ SPDX-FileCopyrightText = "2016-2025 The LmdbJava Open Source Project"
 SPDX-License-Identifier = "Apache-2.0"
 
 [[annotations]]
-path = "third-party-notices/logback-classic-1.6.5/**"
+path = "third-party-notices/logback-classic-1.6.6/**"
 precedence = "override"
 SPDX-FileCopyrightText = "1999-2024 QOS.ch"
 SPDX-License-Identifier = "EPL-2.0 OR LGPL-2.1-only"
 
 [[annotations]]
-path = "third-party-notices/logback-core-1.6.5/**"
+path = "third-party-notices/logback-core-1.6.6/**"
 precedence = "override"
 SPDX-FileCopyrightText = "1999-2024 QOS.ch"
 SPDX-License-Identifier = "EPL-2.0 OR LGPL-2.1-only"
