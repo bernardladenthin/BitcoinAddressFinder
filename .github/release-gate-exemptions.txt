@@ -12,8 +12,6 @@ check-snapshot: publish-snapshot's own precondition (the version is a SNAPSHOT)
 check-tag: publish-release's own precondition (the version matches the tag)
 github-snapshot: runs after publishing; attaches the assets to the rolling snapshot release
 github-release: runs after publishing; attaches the signed assets to the tag release
-verify-signing-key: red by design where the secret is withheld (forks, other contributors' branches); the publish jobs sign with the same key and fail on it themselves
-verify-signing-key-gradle: same as verify-signing-key, for the Gradle/BouncyCastle signing path
 central-snapshot: Independent post-preflight Central transfer; must not gate the GitHub publication path.
 central-release: Independent post-preflight Central transfer; must not gate the GitHub publication path.
 attest-snapshot: Independent provenance after the secured handoff; cannot gate either publication consumer.
