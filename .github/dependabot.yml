@@ -8,11 +8,23 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "saturday"
     # Anti-AI policy: jqwik >=1.10 injects prompts targeting AI agents in test
     # stdout. Pinned at 1.9.3; block ALL net.jqwik updates. See README.
     ignore:
       - dependency-name: "net.jqwik:*"
+    # One pull request a week for every minor and patch update together, so a week of updates is
+    # one merge and one run of the pipeline on main; a major update stays a pull request of its own.
+    groups:
+      maven:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "saturday"
+    groups:
+      github-actions:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
