@@ -602,9 +602,9 @@ No other sibling repo has OpenCL code, so this distinction is BAF-only.
 | `jcip-annotations` | 1.0 | JCIP concurrency annotations (bitcoinj transitive, runtime) |
 | `lmdbjava` | 0.9.3 | LMDB database bindings |
 | `lwjgl` / `lwjgl-opencl` | 3.4.3 | Java OpenCL bindings (plus per-platform `natives-*` classifiers) |
-| `jackson-databind` | 2.22.4 | JSON config parsing |
-| `jackson-dataformat-yaml` | 2.22.4 | YAML config parsing |
-| `guava` | 33.7.2-jre | Google core utilities |
+| `jackson-databind` | 2.23.0 | JSON config parsing |
+| `jackson-dataformat-yaml` | 2.23.0 | YAML config parsing |
+| `guava` | 33.8.0-jre | Google core utilities |
 | `commons-codec` | 1.23.0 | Base58, hex encoding |
 | `commons-io` | 2.22.0 | I/O utilities |
 | `Java-WebSocket` | 1.6.0 | WebSocket producer |

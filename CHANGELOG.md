@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Dependencies, build plugins and Actions, in step with the sibling repositories:** Jackson 2.23.0,
+  pitest-maven 1.30.2, `actions/setup-java` 6.2.0, `github/codeql-action/upload-sarif` 4.39.3 and
+  `anthropics/claude-code-action` v1.0.269. `bernardladenthin/actions` is pinned at v1.1.1: its actions
+  and reusable workflows run `actions/setup-java` 6.2.0, `github/codeql-action` 4.39.3,
+  `gradle/actions/setup-gradle` 6.4.1 and `softprops/action-gh-release` 3.0.4, and
+  `verify-signing-key-gradle` signs with Gradle 9.9.0 by default.
 - **Dependencies and build plugins:** logback-classic 1.6.6, NullAway 0.14.3, maven-surefire-plugin
   3.6.1, jacoco-maven-plugin 0.8.16, palantir-java-format 2.103.0 (no formatting change) and
   `anthropics/claude-code-action` v1.0.264. The license notices shipped for logback name 1.6.6 now; the
