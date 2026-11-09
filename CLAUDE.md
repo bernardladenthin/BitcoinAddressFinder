@@ -816,6 +816,9 @@ in **`.github/actions-config.json`**:
   repository variable `ARTIFACT_TIMEOUT_MINUTES`, else 20 minutes (the workflow's top-level `env`
   reads it; [`../workspace/policies/ci-artifact-timeouts.md`](../workspace/policies/ci-artifact-timeouts.md)),
   instead of GitHub's 360;
+- **Dependabot**: every entry of `.github/dependabot.yml` (the template's) runs weekly on
+  Saturday and has a group -- minor and patch updates as one pull request per ecosystem, a
+  major update as one of its own;
 - **Maven versions** (warnings only): a dependency or plugin (incl. the Spotless formatter version)
   used here in another version than in a sibling of the `java-maven` family (each sibling's POMs come
   from its own configuration), and Kotlin Gradle plugins behind the POMs' Kotlin;
