@@ -90,7 +90,7 @@ SPDX-License-Identifier: Apache-2.0
         <protobuf.version>4.36.2</protobuf.version>
         <jsr305.version>3.0.2</jsr305.version>
         <jcip-annotations.version>1.0</jcip-annotations.version>
-        <guava.version>33.7.2-jre</guava.version>
+        <guava.version>33.8.0-jre</guava.version>
         <jackson.version>2.22.4</jackson.version>
         <lmdbjava.version>0.9.3</lmdbjava.version>
         <lwjgl.version>3.4.3</lwjgl.version>
