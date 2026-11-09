@@ -13,8 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   java-llama.cpp an `upload-artifact` step hung for hours after a build of a minute and a half,
   with GitHub's 360-minute default the only limit; the longest transfer measured over two complete
   runs of that pipeline took 18 s. The workflow's top-level `env` reads the variable with the
-  default, each step says `timeout-minutes: ${{ fromJSON(env.ARTIFACT_TIMEOUT_MINUTES) }}`, the
-  layout `common/check-artifact-timeouts` of bernardladenthin/actions checks.
+  default, each step says `timeout-minutes: ${{ fromJSON(env.ARTIFACT_TIMEOUT_MINUTES) }}`, and
+  `common/check-artifact-timeouts` of bernardladenthin/actions v1.2.0 holds that layout in
+  `repository-checks`.
+- **CI: a pull request Dependabot opens or rebases does not run the Publish pipeline.** Its
+  `startgate` job, which every other job needs, is skipped for it (`github.actor`), so every job
+  of the run is skipped. Such a run got none of the repository's secrets and Dependabot rebases
+  its pull requests on every change of `main`. The merge to `main` runs the pipeline; a push of a
+  person to the branch, or a dispatch on it, runs it too.
+- **bernardladenthin/actions v1.2.0** (from v1.1.1) for every action and reusable workflow it
+  pins.
 - **Dependencies, build plugins and Actions, in step with the sibling repositories:** Jackson 2.23.0,
   pitest-maven 1.30.2, `actions/setup-java` 6.2.0, `github/codeql-action/upload-sarif` 4.39.3 and
   `anthropics/claude-code-action` v1.0.269. `bernardladenthin/actions` is pinned at v1.1.1: its actions
