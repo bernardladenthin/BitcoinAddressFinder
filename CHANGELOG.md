@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and reusable workflows run `actions/setup-java` 6.2.0, `github/codeql-action` 4.39.3,
   `gradle/actions/setup-gradle` 6.4.1 and `softprops/action-gh-release` 3.0.4, and
   `verify-signing-key-gradle` signs with Gradle 9.9.0 by default.
+- **The measurement-tools tests run on Python 3.11 and 3.15** (was 3.10 and 3.15): 3.10 reached its
+  end of life with 3.10.22 in October 2026 (PEP 619), and the workflow moves its lower bound to the
+  oldest Python still receiving security fixes.
 - **Dependencies and build plugins:** logback-classic 1.6.6, NullAway 0.14.3, maven-surefire-plugin
   3.6.1, jacoco-maven-plugin 0.8.16, palantir-java-format 2.103.0 (no formatting change) and
   `anthropics/claude-code-action` v1.0.264. The license notices shipped for logback name 1.6.6 now; the
