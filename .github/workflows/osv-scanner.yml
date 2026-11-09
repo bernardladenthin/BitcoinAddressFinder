@@ -19,7 +19,7 @@ permissions:
 
 jobs:
   scan:
-    uses: bernardladenthin/actions/.github/workflows/osv-scanner.yml@a9386a26fe6706204cb4d975e6958d29bc783624 # v1.1.1
+    uses: bernardladenthin/actions/.github/workflows/osv-scanner.yml@68dde11a60623d76c22a3f1975355a236a6ccd39 # v1.2.0
     permissions:
       actions: read
       contents: read

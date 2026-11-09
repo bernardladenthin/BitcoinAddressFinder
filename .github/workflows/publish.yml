@@ -48,6 +48,11 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  # The minutes an artifact upload or download may take (see bernardladenthin/actions,
+  # common/check-artifact-timeouts): the repository variable, else 20.
+  ARTIFACT_TIMEOUT_MINUTES: ${{ vars.ARTIFACT_TIMEOUT_MINUTES || '20' }}
+
 jobs:
   # ---------------------------------------------------------------------------
   # Start gate — single cancellable abort window before the pipeline starts.
@@ -56,6 +61,12 @@ jobs:
   # ---------------------------------------------------------------------------
   startgate:
     name: Start gate (abort window)
+    # A pull request Dependabot opens or rebases does not start the pipeline: Dependabot
+    # opens one per update and rebases each on every change of main, and its runs get none of
+    # the repository's secrets. Every job needs this one, so all of them are skipped. The merge
+    # to main runs the pipeline, a push of a person to the branch runs it too, and a run on
+    # the branch can be started by hand (workflow_dispatch).
+    if: github.event_name != 'pull_request' || github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     environment: startgate
     steps:
@@ -77,15 +88,17 @@ jobs:
         with:
           persist-credentials: false
       - name: Files equal their templates in bernardladenthin/actions
-        uses: bernardladenthin/actions/common/check-templates@a9386a26fe6706204cb4d975e6958d29bc783624 # v1.1.1
+        uses: bernardladenthin/actions/common/check-templates@68dde11a60623d76c22a3f1975355a236a6ccd39 # v1.2.0
       - name: Release gate (every job gates both publish jobs, or release-gate-exemptions.txt says why)
-        uses: bernardladenthin/actions/common/check-release-gate@a9386a26fe6706204cb4d975e6958d29bc783624 # v1.1.1
+        uses: bernardladenthin/actions/common/check-release-gate@68dde11a60623d76c22a3f1975355a236a6ccd39 # v1.2.0
       - name: Run scripts parse (bash -n over every bash run script of the workflows and actions)
-        uses: bernardladenthin/actions/common/check-run-scripts@a9386a26fe6706204cb4d975e6958d29bc783624 # v1.1.1
+        uses: bernardladenthin/actions/common/check-run-scripts@68dde11a60623d76c22a3f1975355a236a6ccd39 # v1.2.0
+      - name: Artifact timeouts (every upload/download-artifact step times out after ARTIFACT_TIMEOUT_MINUTES)
+        uses: bernardladenthin/actions/common/check-artifact-timeouts@68dde11a60623d76c22a3f1975355a236a6ccd39 # v1.2.0
       - name: Maven versions (warns where a dependency or plugin differs from a sibling repository)
-        uses: bernardladenthin/actions/java/check-maven-versions@a9386a26fe6706204cb4d975e6958d29bc783624 # v1.1.1
+        uses: bernardladenthin/actions/java/check-maven-versions@68dde11a60623d76c22a3f1975355a236a6ccd39 # v1.2.0
       - name: Publication wiring and release asset contract (dry run)
-        uses: bernardladenthin/actions/java/check-publication@a9386a26fe6706204cb4d975e6958d29bc783624 # v1.1.1
+        uses: bernardladenthin/actions/java/check-publication@68dde11a60623d76c22a3f1975355a236a6ccd39 # v1.2.0
 
   # ---------------------------------------------------------------------------
   # GPG signing-key preflight: what maven-gpg-plugin does at deploy time, so a
@@ -104,7 +117,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: maven-central
     steps:
-      - uses: bernardladenthin/actions/common/verify-gpg-key@a9386a26fe6706204cb4d975e6958d29bc783624 # v1.1.1
+      - uses: bernardladenthin/actions/common/verify-gpg-key@68dde11a60623d76c22a3f1975355a236a6ccd39 # v1.2.0
         with:
           private-key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
@@ -125,7 +138,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: bernardladenthin/actions/java/verify-signing-key-gradle@a9386a26fe6706204cb4d975e6958d29bc783624 # v1.1.1
+      - uses: bernardladenthin/actions/java/verify-signing-key-gradle@68dde11a60623d76c22a3f1975355a236a6ccd39 # v1.2.0
         with:
           private-key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
@@ -139,7 +152,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: bernardladenthin/actions/java/maven-code-style@a9386a26fe6706204cb4d975e6958d29bc783624 # v1.1.1
+      - uses: bernardladenthin/actions/java/maven-code-style@68dde11a60623d76c22a3f1975355a236a6ccd39 # v1.2.0
         with:
           package-pattern: 'net\.ladenthin\.'
 
@@ -154,7 +167,7 @@ jobs:
           java-version-file: .java-version
           distribution: temurin
           cache: maven
-      - uses: bernardladenthin/actions/common/setup@a9386a26fe6706204cb4d975e6958d29bc783624 # v1.1.1
+      - uses: bernardladenthin/actions/common/setup@68dde11a60623d76c22a3f1975355a236a6ccd39 # v1.2.0
       - name: Build
         # -Dmaven.javadoc.skip=true is REQUIRED here and is the ONLY surviving javadoc
         # skip across all four sibling repos (do not remove without the full-build check
@@ -179,14 +192,16 @@ jobs:
         # exported by the setup step above).
         run: mvn --batch-mode --no-transfer-progress -P assembly -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -DskipTests -Dmaven.javadoc.skip=true package
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        timeout-minutes: ${{ fromJSON(env.ARTIFACT_TIMEOUT_MINUTES) }}
         with: { name: jars, path: target/*.jar }
       # Echo the crash logs into the job log (workspace/policies/ci-test-diagnostics.md 3.1).
       - name: Print crash logs (on failure)
         if: failure()
-        uses: bernardladenthin/actions/java/print-crash-logs@a9386a26fe6706204cb4d975e6958d29bc783624 # v1.1.1
+        uses: bernardladenthin/actions/java/print-crash-logs@68dde11a60623d76c22a3f1975355a236a6ccd39 # v1.2.0
         with:
           modules: .
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        timeout-minutes: ${{ fromJSON(env.ARTIFACT_TIMEOUT_MINUTES) }}
         if: always()
         with:
           name: build-surefire
@@ -210,7 +225,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Display CPU Info
-        uses: bernardladenthin/actions/common/print-host-info@a9386a26fe6706204cb4d975e6958d29bc783624 # v1.1.1
+        uses: bernardladenthin/actions/common/print-host-info@68dde11a60623d76c22a3f1975355a236a6ccd39 # v1.2.0
       - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
           java-version-file: .java-version
@@ -225,10 +240,11 @@ jobs:
       # Echo the crash logs into the job log (workspace/policies/ci-test-diagnostics.md 3.1).
       - name: Print crash logs (on failure)
         if: failure()
-        uses: bernardladenthin/actions/java/print-crash-logs@a9386a26fe6706204cb4d975e6958d29bc783624 # v1.1.1
+        uses: bernardladenthin/actions/java/print-crash-logs@68dde11a60623d76c22a3f1975355a236a6ccd39 # v1.2.0
         with:
           modules: .
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        timeout-minutes: ${{ fromJSON(env.ARTIFACT_TIMEOUT_MINUTES) }}
         if: always()
         with:
           name: surefire-and-crash-logs-${{ matrix.os }}
@@ -240,6 +256,7 @@ jobs:
         if: always() && runner.os == 'Linux'
         run: free -h
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        timeout-minutes: ${{ fromJSON(env.ARTIFACT_TIMEOUT_MINUTES) }}
         if: matrix.os == 'ubuntu-latest'
         with:
           name: jacoco-report
@@ -260,6 +277,7 @@ jobs:
             fi
           done
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        timeout-minutes: ${{ fromJSON(env.ARTIFACT_TIMEOUT_MINUTES) }}
         if: always() && matrix.os == 'ubuntu-latest'
         with: { name: pit-reports, path: target/pit-reports/ }
 
@@ -274,7 +292,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Display CPU Info
-        uses: bernardladenthin/actions/common/print-host-info@a9386a26fe6706204cb4d975e6958d29bc783624 # v1.1.1
+        uses: bernardladenthin/actions/common/print-host-info@68dde11a60623d76c22a3f1975355a236a6ccd39 # v1.2.0
       - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
           java-version-file: .java-version
@@ -290,6 +308,7 @@ jobs:
           -DfailIfNoTests=false
           -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        timeout-minutes: ${{ fromJSON(env.ARTIFACT_TIMEOUT_MINUTES) }}
         if: always()
         with:
           name: vmlens-report
@@ -338,7 +357,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Display CPU Info
-        uses: bernardladenthin/actions/common/print-host-info@a9386a26fe6706204cb4d975e6958d29bc783624 # v1.1.1
+        uses: bernardladenthin/actions/common/print-host-info@68dde11a60623d76c22a3f1975355a236a6ccd39 # v1.2.0
       - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
           java-version-file: .java-version
@@ -381,6 +400,7 @@ jobs:
           export POCL_MAX_WORK_GROUP_SIZE=256
           mvn -e --batch-mode --no-transfer-progress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true --update-snapshots test jacoco:report
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        timeout-minutes: ${{ fromJSON(env.ARTIFACT_TIMEOUT_MINUTES) }}
         with:
           name: jacoco-report-opencl
           path: target/site/jacoco/jacoco.xml
@@ -398,7 +418,7 @@ jobs:
       # hs_err + surefire dumps: the shared step of every other test job.
       - name: Dump native crash logs (on failure)
         if: ${{ failure() }}
-        uses: bernardladenthin/actions/java/print-crash-logs@a9386a26fe6706204cb4d975e6958d29bc783624 # v1.1.1
+        uses: bernardladenthin/actions/java/print-crash-logs@68dde11a60623d76c22a3f1975355a236a6ccd39 # v1.2.0
       - name: Dump OpenCL surefire reports (on failure)
         if: ${{ failure() }}
         shell: bash
@@ -407,6 +427,7 @@ jobs:
           echo "===== OpenCL surefire reports ====="
           for f in target/surefire-reports/*OpenCL*.txt; do [ -e "$f" ] && { echo "----- $f -----"; cat "$f"; }; done
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        timeout-minutes: ${{ fromJSON(env.ARTIFACT_TIMEOUT_MINUTES) }}
         if: always()
         with:
           name: surefire-and-crash-logs-opencl
@@ -443,6 +464,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        timeout-minutes: ${{ fromJSON(env.ARTIFACT_TIMEOUT_MINUTES) }}
         with:
           name: jars
           path: fatjar/
@@ -458,13 +480,13 @@ jobs:
       # 65 = Java 21, this project's target -- deliberately NOT the 52 the Java 8 siblings use.
       # That is why the ceiling is an argument: it belongs next to the release it describes.
       - name: Verify Java 21 bytecode (no class newer than major 65)
-        uses: bernardladenthin/actions/java/verify-bytecode@a9386a26fe6706204cb4d975e6958d29bc783624 # v1.1.1
+        uses: bernardladenthin/actions/java/verify-bytecode@68dde11a60623d76c22a3f1975355a236a6ccd39 # v1.2.0
         with:
           max-major: "65"
           paths: |
             fatjar
       - name: Run fat-jar smoke test
-        uses: bernardladenthin/actions/java/smoke-fatjar-cli@a9386a26fe6706204cb4d975e6958d29bc783624 # v1.1.1
+        uses: bernardladenthin/actions/java/smoke-fatjar-cli@68dde11a60623d76c22a3f1975355a236a6ccd39 # v1.2.0
         with:
           jar-dir: fatjar
           jar-glob: 'bitcoinaddressfinder-*-jar-with-dependencies.jar'
@@ -481,7 +503,7 @@ jobs:
           java -version
           rm -rf examples/lmdb
       - name: Run the same fat jar on Java 21
-        uses: bernardladenthin/actions/java/smoke-fatjar-cli@a9386a26fe6706204cb4d975e6958d29bc783624 # v1.1.1
+        uses: bernardladenthin/actions/java/smoke-fatjar-cli@68dde11a60623d76c22a3f1975355a236a6ccd39 # v1.2.0
         with:
           jar-dir: fatjar
           jar-glob: 'bitcoinaddressfinder-*-jar-with-dependencies.jar'
@@ -491,6 +513,7 @@ jobs:
       - name: Upload smoke logs
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        timeout-minutes: ${{ fromJSON(env.ARTIFACT_TIMEOUT_MINUTES) }}
         with:
           name: smoke-fatjar-logs
           path: |
@@ -512,6 +535,7 @@ jobs:
       # (the ubuntu `test` matrix skips those because no ICD is installed there,
       # so its jacoco-report shows 0% for the entire OpenCL pipeline).
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        timeout-minutes: ${{ fromJSON(env.ARTIFACT_TIMEOUT_MINUTES) }}
         with: { name: jacoco-report-opencl, path: target/site/jacoco/ }
         continue-on-error: true
       # The dependency graph is submitted by dependency-submission.yml (on pushes to main, with the
@@ -546,7 +570,7 @@ jobs:
       # a release is tagged on.
       - name: Require a SNAPSHOT version
         if: inputs.publish_to_central
-        uses: bernardladenthin/actions/java/check-release-ref@a9386a26fe6706204cb4d975e6958d29bc783624 # v1.1.1
+        uses: bernardladenthin/actions/java/check-release-ref@68dde11a60623d76c22a3f1975355a236a6ccd39 # v1.2.0
         with:
           channel: snapshot
 
@@ -561,7 +585,7 @@ jobs:
           persist-credentials: false
       # The tag names exactly the project version (v1.2.3 for 1.2.3), which is no SNAPSHOT.
       - name: Require the release version the tag names
-        uses: bernardladenthin/actions/java/check-release-ref@a9386a26fe6706204cb4d975e6958d29bc783624 # v1.1.1
+        uses: bernardladenthin/actions/java/check-release-ref@68dde11a60623d76c22a3f1975355a236a6ccd39 # v1.2.0
         with:
           channel: release
 
@@ -612,7 +636,7 @@ jobs:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
       # actionlib on PYTHONPATH and ACTIONS_DIR for the steps below: the preservation and the license
       # collector the assembly profile runs.
-      - uses: bernardladenthin/actions/common/setup@a9386a26fe6706204cb4d975e6958d29bc783624 # v1.1.1
+      - uses: bernardladenthin/actions/common/setup@68dde11a60623d76c22a3f1975355a236a6ccd39 # v1.2.0
       - name: Preserve signed Central outputs before the fat jar rebuild
         run: python3 -m actionlib.java.releaseassets central-assets --maven-only
       - name: "Build & sign fat jar (GitHub asset only \u2014 not deployed to Central)"
@@ -621,7 +645,7 @@ jobs:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
       - name: Finalize and secure the signed publication
         id: finalize
-        uses: bernardladenthin/actions/java/finalize-publication@a9386a26fe6706204cb4d975e6958d29bc783624 # v1.1.1
+        uses: bernardladenthin/actions/java/finalize-publication@68dde11a60623d76c22a3f1975355a236a6ccd39 # v1.2.0
         with:
           channel: snapshot
           maven-assets: central-assets
@@ -638,7 +662,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: bernardladenthin/actions/java/publish-github@a9386a26fe6706204cb4d975e6958d29bc783624 # v1.1.1
+      - uses: bernardladenthin/actions/java/publish-github@68dde11a60623d76c22a3f1975355a236a6ccd39 # v1.2.0
         with:
           channel: snapshot
           assets-complete: ${{ needs.publish-snapshot.outputs.assets_complete }}
@@ -682,7 +706,7 @@ jobs:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
       # actionlib on PYTHONPATH and ACTIONS_DIR for the steps below: the preservation and the license
       # collector the assembly profile runs.
-      - uses: bernardladenthin/actions/common/setup@a9386a26fe6706204cb4d975e6958d29bc783624 # v1.1.1
+      - uses: bernardladenthin/actions/common/setup@68dde11a60623d76c22a3f1975355a236a6ccd39 # v1.2.0
       - name: Preserve signed Central outputs before the fat jar rebuild
         run: python3 -m actionlib.java.releaseassets central-assets --maven-only
       - name: "Build & sign fat jar (GitHub asset only \u2014 not deployed to Central)"
@@ -691,7 +715,7 @@ jobs:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
       - name: Finalize and secure the signed publication
         id: finalize
-        uses: bernardladenthin/actions/java/finalize-publication@a9386a26fe6706204cb4d975e6958d29bc783624 # v1.1.1
+        uses: bernardladenthin/actions/java/finalize-publication@68dde11a60623d76c22a3f1975355a236a6ccd39 # v1.2.0
         with:
           channel: release
           maven-assets: central-assets
@@ -705,7 +729,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: bernardladenthin/actions/java/publish-github@a9386a26fe6706204cb4d975e6958d29bc783624 # v1.1.1
+      - uses: bernardladenthin/actions/java/publish-github@68dde11a60623d76c22a3f1975355a236a6ccd39 # v1.2.0
         with:
           channel: release
           assets-complete: ${{ needs.publish-release.outputs.assets_complete }}
@@ -730,7 +754,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Transfer frozen artifacts (no rebuild, signing or validation polling)
-        uses: bernardladenthin/actions/java/publish-central@a9386a26fe6706204cb4d975e6958d29bc783624 # v1.1.1
+        uses: bernardladenthin/actions/java/publish-central@68dde11a60623d76c22a3f1975355a236a6ccd39 # v1.2.0
         with:
           channel: snapshot
           assets-complete: ${{ needs.publish-snapshot.outputs.assets_complete }}
@@ -751,7 +775,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Transfer frozen artifacts (no rebuild, signing or validation polling)
-        uses: bernardladenthin/actions/java/publish-central@a9386a26fe6706204cb4d975e6958d29bc783624 # v1.1.1
+        uses: bernardladenthin/actions/java/publish-central@68dde11a60623d76c22a3f1975355a236a6ccd39 # v1.2.0
         with:
           channel: release
           assets-complete: ${{ needs.publish-release.outputs.assets_complete }}
@@ -769,7 +793,7 @@ jobs:
       id-token: write
       attestations: write
     steps:
-      - uses: bernardladenthin/actions/java/attest-publication@a9386a26fe6706204cb4d975e6958d29bc783624 # v1.1.1
+      - uses: bernardladenthin/actions/java/attest-publication@68dde11a60623d76c22a3f1975355a236a6ccd39 # v1.2.0
         with:
           channel: snapshot
           assets-complete: ${{ needs.publish-snapshot.outputs.assets_complete }}
@@ -785,7 +809,7 @@ jobs:
       id-token: write
       attestations: write
     steps:
-      - uses: bernardladenthin/actions/java/attest-publication@a9386a26fe6706204cb4d975e6958d29bc783624 # v1.1.1
+      - uses: bernardladenthin/actions/java/attest-publication@68dde11a60623d76c22a3f1975355a236a6ccd39 # v1.2.0
         with:
           channel: release
           assets-complete: ${{ needs.publish-release.outputs.assets_complete }}
