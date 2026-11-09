@@ -48,6 +48,11 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  # The minutes an artifact upload or download may take (see bernardladenthin/actions,
+  # common/check-artifact-timeouts): the repository variable, else 20.
+  ARTIFACT_TIMEOUT_MINUTES: ${{ vars.ARTIFACT_TIMEOUT_MINUTES || '20' }}
+
 jobs:
   # ---------------------------------------------------------------------------
   # Start gate — single cancellable abort window before the pipeline starts.
@@ -179,6 +184,7 @@ jobs:
         # exported by the setup step above).
         run: mvn --batch-mode --no-transfer-progress -P assembly -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -DskipTests -Dmaven.javadoc.skip=true package
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        timeout-minutes: ${{ fromJSON(env.ARTIFACT_TIMEOUT_MINUTES) }}
         with: { name: jars, path: target/*.jar }
       # Echo the crash logs into the job log (workspace/policies/ci-test-diagnostics.md 3.1).
       - name: Print crash logs (on failure)
@@ -187,6 +193,7 @@ jobs:
         with:
           modules: .
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        timeout-minutes: ${{ fromJSON(env.ARTIFACT_TIMEOUT_MINUTES) }}
         if: always()
         with:
           name: build-surefire
@@ -229,6 +236,7 @@ jobs:
         with:
           modules: .
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        timeout-minutes: ${{ fromJSON(env.ARTIFACT_TIMEOUT_MINUTES) }}
         if: always()
         with:
           name: surefire-and-crash-logs-${{ matrix.os }}
@@ -240,6 +248,7 @@ jobs:
         if: always() && runner.os == 'Linux'
         run: free -h
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        timeout-minutes: ${{ fromJSON(env.ARTIFACT_TIMEOUT_MINUTES) }}
         if: matrix.os == 'ubuntu-latest'
         with:
           name: jacoco-report
@@ -260,6 +269,7 @@ jobs:
             fi
           done
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        timeout-minutes: ${{ fromJSON(env.ARTIFACT_TIMEOUT_MINUTES) }}
         if: always() && matrix.os == 'ubuntu-latest'
         with: { name: pit-reports, path: target/pit-reports/ }
 
@@ -290,6 +300,7 @@ jobs:
           -DfailIfNoTests=false
           -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        timeout-minutes: ${{ fromJSON(env.ARTIFACT_TIMEOUT_MINUTES) }}
         if: always()
         with:
           name: vmlens-report
@@ -381,6 +392,7 @@ jobs:
           export POCL_MAX_WORK_GROUP_SIZE=256
           mvn -e --batch-mode --no-transfer-progress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true --update-snapshots test jacoco:report
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        timeout-minutes: ${{ fromJSON(env.ARTIFACT_TIMEOUT_MINUTES) }}
         with:
           name: jacoco-report-opencl
           path: target/site/jacoco/jacoco.xml
@@ -407,6 +419,7 @@ jobs:
           echo "===== OpenCL surefire reports ====="
           for f in target/surefire-reports/*OpenCL*.txt; do [ -e "$f" ] && { echo "----- $f -----"; cat "$f"; }; done
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        timeout-minutes: ${{ fromJSON(env.ARTIFACT_TIMEOUT_MINUTES) }}
         if: always()
         with:
           name: surefire-and-crash-logs-opencl
@@ -443,6 +456,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        timeout-minutes: ${{ fromJSON(env.ARTIFACT_TIMEOUT_MINUTES) }}
         with:
           name: jars
           path: fatjar/
@@ -491,6 +505,7 @@ jobs:
       - name: Upload smoke logs
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        timeout-minutes: ${{ fromJSON(env.ARTIFACT_TIMEOUT_MINUTES) }}
         with:
           name: smoke-fatjar-logs
           path: |
@@ -512,6 +527,7 @@ jobs:
       # (the ubuntu `test` matrix skips those because no ICD is installed there,
       # so its jacoco-report shows 0% for the entire OpenCL pipeline).
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        timeout-minutes: ${{ fromJSON(env.ARTIFACT_TIMEOUT_MINUTES) }}
         with: { name: jacoco-report-opencl, path: target/site/jacoco/ }
         continue-on-error: true
       # The dependency graph is submitted by dependency-submission.yml (on pushes to main, with the
