@@ -303,7 +303,7 @@ SPDX-License-Identifier: Apache-2.0
                 <plugin>
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>exec-maven-plugin</artifactId>
-                    <version>3.6.4</version>
+                    <version>3.7.0</version>
                 </plugin>
                 <plugin>
                     <groupId>org.jacoco</groupId>
@@ -387,7 +387,7 @@ SPDX-License-Identifier: Apache-2.0
                 <configuration>
                   <rules>
                     <requireMavenVersion>
-                      <version>[3.6.3,)</version>
+                      <version>[3.9.0,)</version>
                     </requireMavenVersion>
                     <requireJavaVersion>
                       <version>[21,)</version>
@@ -1392,7 +1392,7 @@ SPDX-License-Identifier: Apache-2.0
                     <plugin>
                         <groupId>org.codehaus.mojo</groupId>
                         <artifactId>exec-maven-plugin</artifactId>
-                        <version>3.6.4</version>
+                        <version>3.7.0</version>
                         <executions>
                             <execution>
                                 <id>collect-runtime-licenses</id>
@@ -1408,7 +1408,7 @@ SPDX-License-Identifier: Apache-2.0
                                              when it is missing instead of a ModuleNotFoundError.
                                              The Python string literals are SINGLE-quoted deliberately. On Windows
                                              exec-maven-plugin drops a double quote out of an argument (measured with
-                                             this plugin version: print("x") reaches Python as print(x)), so the
+                                             exec-maven-plugin 3.6.4: print("x") reaches Python as print(x)), so the
                                              double-quoted form makes this build fail there with a SyntaxError and
                                              exit 1, while the Linux CI stays green and never shows it. Escaping them
                                              as backslash-quote survives Windows but NOT Linux, where the argument

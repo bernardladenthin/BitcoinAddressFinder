@@ -29,6 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   person to the branch, or a dispatch on it, runs it too.
 - **bernardladenthin/actions v1.2.0** (from v1.1.1) for every action and reusable workflow it
   pins.
+- **exec-maven-plugin 3.7.0 and `anthropics/claude-code-action` v1.0.271**, in step with the sibling
+  repositories. exec-maven-plugin 3.7.0 needs Maven 3.9.0, so maven-enforcer requires Maven 3.9.0
+  instead of 3.6.3 to build. `CONTRIBUTING.md` no longer names a Maven Wrapper, which the repository
+  does not have.
 - **Dependencies, build plugins and Actions, in step with the sibling repositories:** Jackson 2.23.0,
   pitest-maven 1.30.2, `actions/setup-java` 6.2.0, `github/codeql-action/upload-sarif` 4.39.3 and
   `anthropics/claude-code-action` v1.0.269. `bernardladenthin/actions` is pinned at v1.1.1: its actions

@@ -20,7 +20,7 @@ This document provides guidance for AI assistants working on the BitcoinAddressF
 
 ## Build System
 
-The project uses **Maven** (minimum 3.6.3). **There is no Maven Wrapper in this repository** —
+The project uses **Maven** (minimum 3.9.0, which exec-maven-plugin 3.7.0 needs). **There is no Maven Wrapper in this repository** —
 `mvnw` / `mvnw.cmd` do not exist, so use an installed `mvn`. Commands below are written that way;
 a wrapper could be added later, but until it is, `./mvnw ...` fails outright.
 
