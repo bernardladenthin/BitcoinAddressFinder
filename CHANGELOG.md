@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stays a pull request of its own), on Saturday, so a week of updates is one merge and one run of
   the pipeline on `main`. `common/check-dependabot` in `repository-checks` holds the file to that
   rule, and every action and reusable workflow of bernardladenthin/actions is pinned at v1.2.1.
+- **bernardladenthin/actions v1.2.2.** The snapshot publication no longer deletes the `snapshot` tag
+  when GitHub refuses the workflow token the move (a 403 after a change to a workflow file): the
+  tag stays where it is, the run warns with the command that moves it, and the pre-release is
+  updated all the same. Before, the fallback deleted the tag, could not create it again, and left
+  the pre-release a draft (java-llama.cpp, Publish run 42708115919).
 - **CI: every artifact upload and download step times out**, after the minutes of the repository
   variable `ARTIFACT_TIMEOUT_MINUTES`, else 20 (11 steps in `publish.yml`). In a Publish run of
   java-llama.cpp an `upload-artifact` step hung for hours after a build of a minute and a half,
