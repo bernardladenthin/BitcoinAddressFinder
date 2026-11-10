@@ -14,4 +14,4 @@ permissions:
 
 jobs:
   test:
-    uses: bernardladenthin/actions/.github/workflows/reuse.yml@f62f8f48b84f4789ef57af563d364b2c0b658ab0 # v1.2.1
+    uses: bernardladenthin/actions/.github/workflows/reuse.yml@379fb9448915b8ce7153f6ec5fa65544205196db # v1.2.2
