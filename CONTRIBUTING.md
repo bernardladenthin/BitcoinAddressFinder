@@ -7,28 +7,28 @@ Thank you for your interest in contributing to **BitcoinAddressFinder**. This do
 ### Prerequisites
 
 - **Java 21** (OpenJDK or any compatible distribution).
-- **Maven 3.6.3+** — a Maven Wrapper (`./mvnw`) is included; no separate installation required.
+- **Maven 3.9.0+** — there is no Maven Wrapper in this repository; use an installed `mvn`.
 
 ### Common commands
 
 ```bash
 # Compile only
-./mvnw compile
+mvn compile
 
 # Run the full test suite
-./mvnw test
+mvn test
 
 # Build a fat JAR with all dependencies (assembly profile)
-./mvnw package -P assembly
+mvn package -P assembly
 
 # Build without running tests
-./mvnw package -DskipTests
+mvn package -DskipTests
 
 # Generate a JaCoCo code-coverage report (target/site/jacoco/index.html)
-./mvnw test jacoco:report
+mvn test jacoco:report
 
 # Skip LMDB-specific tests when native LMDB libraries are unavailable
-./mvnw test -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true
+mvn test -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true
 ```
 
 ### Running the tool
@@ -45,7 +45,7 @@ Pre-built example configuration files and Windows batch scripts live in the
 
 ### JVM memory and module flags
 
-Tests are launched with `-Xmx2g` (the initial heap is left at the JVM default — no eager `-Xms` — because each test class runs in its own short-lived fork) and several `--add-opens` flags (for LMDB and internal module access). These are defined in `pom.xml` (`<argLine>`) and `.mvn/jvm.config` — the Maven Wrapper picks them up automatically.
+Tests are launched with `-Xmx2g` (the initial heap is left at the JVM default — no eager `-Xms` — because each test class runs in its own short-lived fork) and several `--add-opens` flags (for LMDB and internal module access). These are defined in `pom.xml` (`<argLine>`) and `.mvn/jvm.config` — Maven picks them up automatically.
 
 ## Reporting issues
 
@@ -76,7 +76,7 @@ For security-sensitive issues, do **not** open a public issue — see [`SECURITY
 4. **Make changes** — write code and tests (see [Test policy](#test-policy)).
 5. **Verify** that the full test suite passes before pushing:
    ```bash
-   ./mvnw test
+   mvn test
    ```
 6. **Push** the branch to your fork and **open a Pull Request** against `main`.
 7. A project maintainer will review the PR; address any requested changes and push additional commits to the same branch.
