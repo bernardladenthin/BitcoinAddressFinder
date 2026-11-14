@@ -596,7 +596,7 @@ No other sibling repo has OpenCL code, so this distinction is BAF-only.
 | Dependency | Version | Purpose |
 |---|---|---|
 | `bitcoinj-core` | 0.17.1 | Bitcoin crypto, address derivation |
-| `bcprov-jdk15to18` | 1.86 | Bouncy Castle crypto provider (bitcoinj transitive; pinned to fix GHSA-c3fc-8qff-9hwx, GHSA-p93r-85wp-75v3) |
+| `bcprov-jdk15to18` | 1.87 | Bouncy Castle crypto provider (bitcoinj transitive; pinned to fix GHSA-c3fc-8qff-9hwx, GHSA-p93r-85wp-75v3) |
 | `protobuf-javalite` | 4.36.2 | Protocol Buffers (bitcoinj transitive; pinned to latest) |
 | `jsr305` | 3.0.2 | Findbugs nullability annotations (bitcoinj transitive, runtime) |
 | `jcip-annotations` | 1.0 | JCIP concurrency annotations (bitcoinj transitive, runtime) |
@@ -611,7 +611,7 @@ No other sibling repo has OpenCL code, so this distinction is BAF-only.
 | `jeromq` | 0.6.0 | ZeroMQ producer |
 | `jspecify` | 1.0.1 | Nullness annotations |
 | `slf4j-api` | 2.0.20 | Logging facade |
-| `logback-classic` | 1.6.6 | SLF4J implementation |
+| `logback-classic` | 1.6.7 | SLF4J implementation |
 
 Test-only:
 | `junit-jupiter` | 6.1.3 | JUnit 6 (Jupiter) test framework |

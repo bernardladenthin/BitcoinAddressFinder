@@ -1,6 +1,6 @@
 component	file	source	sha256
-logback-classic-1.6.6	LICENSE.txt	https://raw.githubusercontent.com/qos-ch/logback/v_1.6.6/LICENSE.txt	f1eedf4f2cb9e901d6ae549a06d0c20dcde0136d37e38b50adaf51d4673f66d2
-logback-core-1.6.6	LICENSE.txt	https://raw.githubusercontent.com/qos-ch/logback/v_1.6.6/LICENSE.txt	f1eedf4f2cb9e901d6ae549a06d0c20dcde0136d37e38b50adaf51d4673f66d2
+logback-classic-1.6.7	LICENSE.txt	https://raw.githubusercontent.com/qos-ch/logback/v_1.6.7/LICENSE.txt	f1eedf4f2cb9e901d6ae549a06d0c20dcde0136d37e38b50adaf51d4673f66d2
+logback-core-1.6.7	LICENSE.txt	https://raw.githubusercontent.com/qos-ch/logback/v_1.6.7/LICENSE.txt	f1eedf4f2cb9e901d6ae549a06d0c20dcde0136d37e38b50adaf51d4673f66d2
 jffi-1.3.14	LICENSE	https://raw.githubusercontent.com/jnr/jffi/jffi-1.3.14/LICENSE	0f410be04ea523c0a69929fdb87379b3d52560318986c7ed9e08fe461d92c324
 jffi-1.3.14	jni/libffi/LICENSE	https://raw.githubusercontent.com/jnr/jffi/jffi-1.3.14/jni/libffi/LICENSE	2c9c2acb9743e6b007b91350475308aee44691d96aa20eacef8e199988c8c388
 jnr-a64asm-1.0.0	LICENSE	https://raw.githubusercontent.com/jnr/jnr-a64asm/jnr-a64asm-1.0.0/LICENSE	d71b5bf8091309170a546f6fc1428edd8b54064c28ab100649d2045434e129b6
@@ -30,7 +30,7 @@ bitcoinj-core-0.17.1	source-headers/org/bitcoinj/crypto/EncryptedData.java.heade
 bitcoinj-core-0.17.1	source-headers/org/bitcoinj/crypto/KeyCrypter.java.header.txt	https://repo1.maven.org/maven2/org/bitcoinj/bitcoinj-core/0.17.1/bitcoinj-core-0.17.1-sources.jar!/org/bitcoinj/crypto/KeyCrypter.java (leading comment, verbatim)	9dc6044f0f5c89ef2f6231876647bb8521aaa240cb5beb6eb7e94940608ec1dd
 bitcoinj-core-0.17.1	source-headers/org/bitcoinj/crypto/KeyCrypterScrypt.java.header.txt	https://repo1.maven.org/maven2/org/bitcoinj/bitcoinj-core/0.17.1/bitcoinj-core-0.17.1-sources.jar!/org/bitcoinj/crypto/KeyCrypterScrypt.java (leading comment, verbatim)	5505415526f05fe13b5ec7af59decb30331dbea3e16f15a8ef85acff7fafa191
 bitcoinj-core-0.17.1	source-headers/org/bitcoinj/crypto/PBKDF2SHA512.java.header.txt	https://repo1.maven.org/maven2/org/bitcoinj/bitcoinj-core/0.17.1/bitcoinj-core-0.17.1-sources.jar!/org/bitcoinj/crypto/PBKDF2SHA512.java (leading comment, verbatim)	40521eb9bd6f76c4606dd980d79b374f556679ca9c805f38d3d3ad88093f1104
-bcprov-jdk15to18-1.86	LICENSE.md	https://raw.githubusercontent.com/bcgit/bc-java/r1rv86/LICENSE.md	0e01f1549c9022f406392ac2947d32223b7c2e977d21ea2f8c182fdeb4dae5fd
+bcprov-jdk15to18-1.87	LICENSE.md	https://raw.githubusercontent.com/bcgit/bc-java/r1rv87/LICENSE.md	0e01f1549c9022f406392ac2947d32223b7c2e977d21ea2f8c182fdeb4dae5fd
 Java-WebSocket-1.6.0	LICENSE	https://raw.githubusercontent.com/TooTallNate/Java-WebSocket/v1.6.0/LICENSE	15101a7cbdaa7f1c161424b760e907e7832e4a1e7f05d03373ca91fbffdb95ee
 jspecify-1.0.1	LICENSE	https://raw.githubusercontent.com/jspecify/jspecify/v1.0.1/LICENSE	cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30
 jspecify-1.0.1	AUTHORS	https://raw.githubusercontent.com/jspecify/jspecify/v1.0.1/AUTHORS	e70db5d4e0bd433a8b9357518dd8f8847c434826d9587cfc35eca1e1d5a57d3f

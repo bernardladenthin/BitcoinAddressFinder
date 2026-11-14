@@ -44,7 +44,7 @@
       ]
     },
     {
-      "directory": "bcprov-jdk15to18-1.86",
+      "directory": "bcprov-jdk15to18-1.87",
       "license": "MIT",
       "artifacts": [
         "bcprov-jdk15to18"
@@ -156,14 +156,14 @@
       ]
     },
     {
-      "directory": "logback-classic-1.6.6",
+      "directory": "logback-classic-1.6.7",
       "license": "EPL-2.0 OR LGPL-2.1-only",
       "artifacts": [
         "logback-classic"
       ]
     },
     {
-      "directory": "logback-core-1.6.6",
+      "directory": "logback-core-1.6.7",
       "license": "EPL-2.0 OR LGPL-2.1-only",
       "artifacts": [
         "logback-core"

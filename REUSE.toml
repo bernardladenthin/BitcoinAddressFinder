@@ -187,7 +187,7 @@ SPDX-FileCopyrightText = "2000-2011 INRIA, France Telecom"
 SPDX-License-Identifier = "BSD-3-Clause"
 
 [[annotations]]
-path = "third-party-notices/bcprov-jdk15to18-1.86/**"
+path = "third-party-notices/bcprov-jdk15to18-1.87/**"
 precedence = "override"
 SPDX-FileCopyrightText = "2000-2026 The Legion of the Bouncy Castle Inc."
 SPDX-License-Identifier = "MIT"
@@ -283,13 +283,13 @@ SPDX-FileCopyrightText = "2016-2025 The LmdbJava Open Source Project"
 SPDX-License-Identifier = "Apache-2.0"
 
 [[annotations]]
-path = "third-party-notices/logback-classic-1.6.6/**"
+path = "third-party-notices/logback-classic-1.6.7/**"
 precedence = "override"
 SPDX-FileCopyrightText = "1999-2024 QOS.ch"
 SPDX-License-Identifier = "EPL-2.0 OR LGPL-2.1-only"
 
 [[annotations]]
-path = "third-party-notices/logback-core-1.6.6/**"
+path = "third-party-notices/logback-core-1.6.7/**"
 precedence = "override"
 SPDX-FileCopyrightText = "1999-2024 QOS.ch"
 SPDX-License-Identifier = "EPL-2.0 OR LGPL-2.1-only"

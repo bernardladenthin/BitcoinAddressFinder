@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Bouncy Castle 1.87 (`bcprov-jdk15to18`, from 1.86), logback-classic 1.6.7, `actions/setup-java` 6.3.0
+  and `anthropics/claude-code-action` v1.0.276.** The license notices shipped for Bouncy Castle and
+  logback name the new versions; their license texts are unchanged.
 - - **Dependabot: one grouped pull request per ecosystem a week, on Saturday.**
   `.github/dependabot.yml` is the template of bernardladenthin/actions v1.2.1: every minor and
   patch update of Maven, and of the GitHub Actions, comes in one pull request (a major update
