@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **maven-artifact 3.10.1 and `anthropics/claude-code-action` v1.0.278**, in step with the sibling
+  repositories.
 - **Bouncy Castle 1.87 (`bcprov-jdk15to18`, from 1.86), logback-classic 1.6.7, `actions/setup-java` 6.3.0
   and `anthropics/claude-code-action` v1.0.276.** The license notices shipped for Bouncy Castle and
   logback name the new versions; their license texts are unchanged.
