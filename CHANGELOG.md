@@ -8,12 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **logback-classic 1.6.8, Error Prone 2.53.0, spotless-maven-plugin 3.12.0, maven-artifact 3.10.2,
+  `ossf/scorecard-action` v2.6.0, `github/codeql-action` v4.39.4 and `anthropics/claude-code-action`
+  v1.0.286**, in step with the sibling repositories (Dependabot had moved the other three to Error
+  Prone 2.53.0 and left this one out). The license notices shipped for logback name the new version;
+  its license text is unchanged.
 - **maven-artifact 3.10.1 and `anthropics/claude-code-action` v1.0.278**, in step with the sibling
   repositories.
 - **Bouncy Castle 1.87 (`bcprov-jdk15to18`, from 1.86), logback-classic 1.6.7, `actions/setup-java` 6.3.0
   and `anthropics/claude-code-action` v1.0.276.** The license notices shipped for Bouncy Castle and
   logback name the new versions; their license texts are unchanged.
-- - **Dependabot: one grouped pull request per ecosystem a week, on Saturday.**
+- **Dependabot: one grouped pull request per ecosystem a week, on Saturday.**
   `.github/dependabot.yml` is the template of bernardladenthin/actions v1.2.1: every minor and
   patch update of Maven, and of the GitHub Actions, comes in one pull request (a major update
   stays a pull request of its own), on Saturday, so a week of updates is one merge and one run of
