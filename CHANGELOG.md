@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stays a pull request of its own), on Saturday, so a week of updates is one merge and one run of
   the pipeline on `main`. `common/check-dependabot` in `repository-checks` holds the file to that
   rule, and every action and reusable workflow of bernardladenthin/actions is pinned at v1.2.1.
+- **bernardladenthin/actions v1.2.3.** Every action and reusable workflow of it is pinned at v1.2.3
+  (from v1.2.2), a release of newer pins only: actions/setup-java v6.3.0 in its composite actions,
+  github/codeql-action v4.39.4 and google/osv-scanner-action v2.7.1 in its reusable workflows, and
+  Gradle 9.9.2 as the default of `java/verify-signing-key-gradle`.
 - **bernardladenthin/actions v1.2.2.** The snapshot publication no longer deletes the `snapshot` tag
   when GitHub refuses the workflow token the move (a 403 after a change to a workflow file): the
   tag stays where it is, the run warns with the command that moves it, and the pre-release is

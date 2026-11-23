@@ -16,6 +16,6 @@ permissions:
 
 jobs:
   submit:
-    uses: bernardladenthin/actions/.github/workflows/java-maven-dependency-submission.yml@379fb9448915b8ce7153f6ec5fa65544205196db # v1.2.2
+    uses: bernardladenthin/actions/.github/workflows/java-maven-dependency-submission.yml@e7554f8d2e3f2e59dac55c5f6a7cb5be7b6d8606 # v1.2.3
     permissions:
       contents: write
